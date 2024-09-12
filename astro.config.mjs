@@ -23,5 +23,5 @@ export default defineConfig({
   // Asegúrate de que esto esté configurado como 'server' o 'hybrid'
   output: 'server',
 
-  adapter: vercel()
+  adapter: vercel(),
 });
