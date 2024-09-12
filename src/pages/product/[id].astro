@@ -1,0 +1,26 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getProducts } from '../../firebase/server';
+
+const { id } = Astro.params;
+const products = await getProducts();
+const product = products.find(p => p.id === id);
+
+if (!product) {
+  throw new Error('Producto no encontrado');
+}
+---
+
+<BaseLayout>
+  <section>
+    <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
+      <div class="bg-white p-6 rounded-lg shadow-lg">
+        <img src={product.imageUrl} alt={product.name} class="w-full h-auto max-h-96 object-contain rounded-md" />
+        <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
+        <p class="mt-2 text-gray-600">{product.description}</p>
+        <p class="mt-2 text-gray-800 font-bold">${product.price}</p>
+        <p class="mt-2 text-gray-600">Stock: {product.stock}</p>
+      </div>
+    </div>
+  </section>
+</BaseLayout>

@@ -1,9 +1,9 @@
 import { defineConfig } from 'astro/config';
 import sitemap from "@astrojs/sitemap";
 import tailwindcss from '@tailwindcss/vite';
-import db from '@astrojs/db';
+
 export default defineConfig({
-vite: {
+  vite: {
     plugins: [tailwindcss()],
   },
   server: {
@@ -11,7 +11,7 @@ vite: {
       allow: ['src']
     }
   },
-    // add yur domain name here
-   site: 'https://lexingtonthemes.com',
-  integrations: [sitemap(), db()]
+  site: 'https://lexingtonthemes.com',
+  integrations: [sitemap()], // Elimina db() de aquí
+  output: 'server' // Asegúrate de que esto esté configurado como 'server' o 'hybrid'
 });

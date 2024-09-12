@@ -1,76 +1,48 @@
+---
+import { getProducts } from '../../firebase/server';
+
+const products = await getProducts();
+---
+
 <section>
-  <div
-    class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
+  <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
     <div>
       <div class="text-center max-w-4xl mx-auto">
         <div class="sm:flex sm:justify-center">
-          <div
-            class="relative rounded-full py-1 px-3 text-sm leading-6 text-gray-600 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
-            <a
-              href="https://lexingtonthemes.com/free-templates/"
-              class="font-semibold text-accent-600"
-              ><span class="absolute inset-0" aria-hidden="true"></span>
-              <span class="block lg:inline">
-                Lo más buscado <span aria-hidden="true"
-                  >&rarr;</span
-                >
-              </span>
+          <div class="relative rounded-full py-1 px-3 text-sm leading-6 text-gray-600 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
+            <a href="https://lexingtonthemes.com/free-templates/" class="font-semibold text-accent-600">
+              <span class="absolute inset-0" aria-hidden="true"></span>
+              <span class="block lg:inline">Lo más buscado <span aria-hidden="true">→</span></span>
             </a>
           </div>
         </div>
-        <p
-          class="text-4xl tracking-tight font-semibold text-black md:text-5xl font-display mt-8">
-          Mundo Vinilos
-        </p>
-        <p class="text-gray-500 lg:text-xl max-w-2xl mt-4 mx-auto text-base">
-          Vinilo que buscas, vinilo que encuentras.
-        </p>
+        <p class="text-4xl tracking-tight font-semibold text-black md:text-5xl font-display mt-8">Mundo Vinilos</p>
+        <p class="text-gray-500 lg:text-xl max-w-2xl mt-4 mx-auto text-base">Vinilo que buscas, vinilo que encuentras.</p>
       </div>
-      <dl
-        class="lg:gap-x-8 lg:grid-cols-3 max-w-4xl mt-8 mx-auto sm:gap-x-6 sm:gap-y-12 sm:grid sm:grid-cols-2 sm:space-y-0 space-y-6 text-center text-sm items-start">
+      <dl class="lg:gap-x-8 lg:grid-cols-3 max-w-4xl mt-8 mx-auto sm:gap-x-6 sm:gap-y-12 sm:grid sm:grid-cols-2 sm:space-y-0 space-y-6 text-center text-sm items-start">
         <div class="text-gray-500">
-          <strong class="text-gray-700"
-            >Tus vinilos favoritos al mejor precio</strong
-          > ━ Encontrarás una lista de precios ordenados del más bajo al más alto.
+          <strong class="text-gray-700">Tus vinilos favoritos al mejor precio</strong> ━ Encontrarás una lista de precios ordenados del más bajo al más alto.
         </div>
         <div class="text-gray-500">
-          <strong class="text-gray-700">Álbumes en tendencia</strong> ━ Todos los
-          artistas y álbumes del momento en nuestra página principal.
+          <strong class="text-gray-700">Álbumes en tendencia</strong> ━ Todos los artistas y álbumes del momento en nuestra página principal.
         </div>
         <div class="text-gray-500">
-          <strong class="text-gray-700">Tus vendedores de confianza</strong> ━ Encuentra a
-          tu vendedor favorito o explora otros vendedores cercanos a tu zona.
+          <strong class="text-gray-700">Tus vendedores de confianza</strong> ━ Encuentra a tu vendedor favorito o explora otros vendedores cercanos a tu zona.
         </div>
       </dl>
     </div>
-    <div class="relative w-full mx-auto max-w-7xl items-center py-12 pb-12">
-      <div class="bg-gray-100 p-8 rounded-3xl">
-        <img
-          alt="#_"
-          class="relative w-full border border-gray-200 lg:rounded-2xl object-cover rounded shadow-2xl"
-          src="https://brightlight.lexingtonthemes.com/assets/dashboard.svg"
-        />
-      </div>
-    </div>
-    <div class="grid grid-cols-2 gap-0.5 lg:mt-8 md:grid-cols-6 mt-6">
-      <div class="flex justify-center col-span-1 ">
-        <img alt="logo" class="h-8" src="/Figma.svg" />
-      </div>
-      <div class="flex justify-center col-span-1 ">
-        <img alt="logo" class="h-8" src="/Canva.svg" />
-      </div>
-      <div class="flex justify-center col-span-1 ">
-        <img alt="logo" class="h-8" src="/Stripe.svg" />
-      </div>
-      <div class="flex justify-center col-span-1 ">
-        <img alt="logo" class="h-8" src="/Gitlab.svg" />
-      </div>
-      <div class="flex justify-center col-span-1 ">
-        <img alt="logo" class="h-8" src="/Linear.svg" />
-      </div>
-      <div class="flex justify-center col-span-1 ">
-        <img alt="logo" class="h-8" src="/Gumroad.svg" />
-      </div>
+  <div class="mt-12">
+    <h2 class="text-2xl font-semibold text-center">Nuestros Productos</h2>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+      {products.map(product => (
+        <a href={`/product/${product.id}`} class="bg-white p-6 rounded-lg shadow-lg">
+          <img src={product.imageUrl} alt={product.name} class="w-full h-48 object-cover rounded-md" />
+          <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
+          <p class="mt-2 text-gray-600">{product.description}</p>
+          <p class="mt-2 text-gray-800 font-bold">${product.price}</p>
+          <p class="mt-2 text-gray-600">Stock: {product.stock}</p>
+        </a>
+      ))}
     </div>
   </div>
 </section>

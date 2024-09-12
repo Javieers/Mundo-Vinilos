@@ -18,8 +18,13 @@
   },
   "dependencies": {
     "@astrojs/check": "^0.9.3",
-    "@astrojs/db": "^0.14.1",
+    "@types/bcrypt": "^5.0.2",
+    "bcrypt": "^5.1.1",
+    "dotenv": "^16.4.5",
+    "express": "^4.20.0",
     "firebase": "^10.13.1",
+    "firebase-admin": "^12.4.0",
+    "mongodb": "^6.8.1",
     "typescript": "^5.6.2"
   }
 }
