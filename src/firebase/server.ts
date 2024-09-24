@@ -29,7 +29,6 @@ const auth = getAuth();
 const firestore = getFirestore();
 const storage = getStorage().bucket();
 
-
 async function getProducts() {
   const querySnapshot = await firestore.collection('products').get();
   const products = [];
@@ -39,4 +38,35 @@ async function getProducts() {
   return products;
 }
 
-export { auth, firestore, getProducts};
+// Guardar información del vendedor en la colección 'sellers'
+export async function saveSellerProductInfo(sellerId: string, sellerName: string, productId: string, price: number, stock: number) {
+  try {
+    const sellerData = {
+      sellerId,
+      sellerName,
+      productId,
+      price,
+      stock,
+    };
+    const docRef = await firestore.collection('sellers').add(sellerData); // Guarda el documento en Firestore
+    console.log('Información del vendedor guardada con ID:', docRef.id); // Mensaje en consola
+    return { id: docRef.id, ...sellerData };
+  } catch (error) {
+    console.error('Error al guardar la información del vendedor:', error);
+    throw new Error('Error al guardar la información del vendedor');
+  }
+}
+
+// Obtener los precios y stocks de todos los vendedores para un producto
+export async function getSellerProductInfo(productId: string) {
+  const querySnapshot = await firestore.collection('sellers').where('productId', '==', productId).get();
+  const sellerInfo = [];
+  
+  querySnapshot.forEach((doc) => {
+    sellerInfo.push(doc.data());
+  });
+  
+  return sellerInfo;
+}
+
+export { auth, firestore, getProducts };
