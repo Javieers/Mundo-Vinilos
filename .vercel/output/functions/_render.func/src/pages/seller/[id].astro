@@ -1,0 +1,53 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";  // Verifica la ruta correcta
+import { getSellerInfo } from '../../firebase/server';  // Asegúrate de que el archivo sea el correcto
+
+const { id } = Astro.params;
+const sellerInfo = await getSellerInfo(id);  // Obtener los datos del vendedor
+
+if (!sellerInfo) {
+  throw new Error('Vendedor no encontrado');
+}
+
+const { seller, products } = sellerInfo;
+---
+
+<BaseLayout>
+  <section>
+    <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
+      <div class="bg-white p-6 rounded-lg shadow-lg">
+        <img src={seller.sellerImage} alt={seller.sellerName} class="w-full h-auto max-h-96 object-contain rounded-md" />
+        <h3 class="mt-4 text-lg font-semibold">{seller.sellerName}</h3>
+
+        <h4 class="mt-8 text-xl font-semibold">Productos Disponibles</h4>
+        <ul class="mt-4">
+          {products.length > 0 ? (
+            products.map(product => (
+              <li class="border-b py-4">
+                <a href={`/product/${product.productId}`} class="text-blue-600 underline">{product.name}</a> - ${product.price} {product.stock === 0 ? '(Agotado)' : `(Stock: ${product.stock})`}
+              </li>
+            ))
+          ) : (
+            <p class="text-gray-500">Este vendedor no tiene productos disponibles.</p>
+          )}
+        </ul>
+
+        <h4 class="mt-12 text-xl font-semibold">Reseñas</h4>
+        <div class="mt-4">
+          {seller.reviews.length > 0 ? (
+            seller.reviews.map(review => (
+              <div class="border-b py-4">
+                <p class="text-gray-700">{review.text}</p>
+                <p class="text-gray-500 text-sm">- {review.user}</p>
+              </div>
+            ))
+          ) : (
+            <p class="text-gray-500">Este vendedor no tiene reseñas aún.</p>
+          )}
+        </div>
+      </div>
+    </div>
+  </section>
+</BaseLayout>
+
+

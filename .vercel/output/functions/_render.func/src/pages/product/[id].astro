@@ -1,10 +1,12 @@
 ---
+// Importamos la función para obtener vendedores y detalles del producto
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getProducts } from '../../firebase/server';
+import { getProducts, getSellerProductInfo } from '../../firebase/server';
 
 const { id } = Astro.params;
 const products = await getProducts();
 const product = products.find(p => p.id === id);
+const sellers = await getSellerProductInfo(id); // Obtenemos la información de vendedores
 
 if (!product) {
   throw new Error('Producto no encontrado');
@@ -20,6 +22,22 @@ if (!product) {
         <p class="mt-2 text-gray-600">{product.description}</p>
         <p class="mt-2 text-gray-800 font-bold">${product.price}</p>
         <p class="mt-2 text-gray-600">Stock: {product.stock}</p>
+      </div>
+
+      <div class="mt-12">
+        <h3 class="text-2xl font-semibold">Precios por vendedor</h3>
+        <ul class="mt-4">
+          {sellers.length > 0 ? (
+            sellers.map(seller => (
+              <li class="border-b py-4">
+              <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
+                - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
+              </li>
+            ))
+          ) : (
+            <p class="text-gray-500">No hay vendedores disponibles para este producto.</p>
+          )}
+        </ul>
       </div>
     </div>
   </section>

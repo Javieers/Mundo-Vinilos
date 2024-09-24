@@ -47,6 +47,7 @@ export async function saveSellerProductInfo(sellerId: string, sellerName: string
       productId,
       price,
       stock,
+      reviews: [], // Inicializa como un array vacío
     };
     const docRef = await firestore.collection('sellers').add(sellerData); // Guarda el documento en Firestore
     console.log('Información del vendedor guardada con ID:', docRef.id); // Mensaje en consola
@@ -57,16 +58,82 @@ export async function saveSellerProductInfo(sellerId: string, sellerName: string
   }
 }
 
-// Obtener los precios y stocks de todos los vendedores para un producto
-export async function getSellerProductInfo(productId: string) {
-  const querySnapshot = await firestore.collection('sellers').where('productId', '==', productId).get();
-  const sellerInfo = [];
-  
-  querySnapshot.forEach((doc) => {
-    sellerInfo.push(doc.data());
-  });
-  
-  return sellerInfo;
+
+// Obtener vendedores que venden un producto específico
+export async function getSellerProductInfo(productId) {
+  try {
+    const sellersRef = firestore.collection('sellers');
+    const snapshot = await sellersRef.where('productId', '==', productId).get();
+
+    if (snapshot.empty) {
+      return [];
+    }
+
+    const sellers = snapshot.docs.map(doc => ({
+      sellerName: doc.data().sellerName,
+      sellerId: doc.data().sellerId, // Asegúrate de capturar el sellerId correcto
+      price: doc.data().price,
+      stock: doc.data().stock,
+    }));
+
+    return sellers;
+  } catch (error) {
+    console.error('Error obteniendo información de vendedores:', error);
+    return [];
+  }
 }
+
+// Obtener información del vendedor por su ID
+export async function getSellerInfo(sellerId: string) {
+  try {
+    // Obtener la información del vendedor por ID desde la colección "sellers"
+    const sellerSnapshot = await firestore.collection('sellers').where('sellerId', '==', sellerId).get();
+    
+    // Verificar si el vendedor existe
+    if (sellerSnapshot.empty) {
+      throw new Error('Vendedor no encontrado');
+    }
+
+    const sellerData = sellerSnapshot.docs[0].data(); // Tomar los datos del primer documento del vendedor
+
+    // Obtener todos los productos que este vendedor ha listado
+    const products = await Promise.all(sellerSnapshot.docs.map(async doc => {
+      const data = doc.data();
+      const productDoc = await firestore.collection('products').doc(data.productId).get();
+
+      if (!productDoc.exists) {
+        return {
+          productId: data.productId,
+          sellerName: data.sellerName,
+          price: data.price,
+          stock: data.stock,
+          name: 'Nombre no disponible', // Si no existe el producto, retorna un nombre predeterminado
+        };
+      }
+
+      return {
+        productId: data.productId,
+        sellerName: data.sellerName,
+        price: data.price,
+        stock: data.stock,
+        name: productDoc.data().name, // Nombre del producto
+      };
+    }));
+
+    // Retornar la información del vendedor y los productos que ofrece
+    return {
+      seller: {
+        sellerName: sellerData.sellerName,
+        sellerImage: sellerData.sellerImage || '',  // Imagen del vendedor
+        reviews: sellerData.reviews || [],  // Reseñas del vendedor (puede estar vacío)
+      },
+      products
+    };
+  } catch (error) {
+    console.error('Error obteniendo la información del vendedor:', error);
+    throw new Error('Error al obtener la información del vendedor');
+  }
+}
+
 
 export { auth, firestore, getProducts };

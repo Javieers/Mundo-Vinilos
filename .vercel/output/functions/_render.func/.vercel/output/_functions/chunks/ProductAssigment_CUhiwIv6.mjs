@@ -1,7 +1,7 @@
 import { c as createComponent, r as renderTemplate, m as maybeRenderHead, a as addAttribute } from './astro/server_BCQgC0OR.mjs';
 import 'kleur/colors';
 import 'clsx';
-import { g as getProducts } from './server_D_TZjYN_.mjs';
+import { g as getProducts } from './server_B6Bxn1q6.mjs';
 
 const $$ProductAssigment = createComponent(async ($$result, $$props, $$slots) => {
   const products = await getProducts();

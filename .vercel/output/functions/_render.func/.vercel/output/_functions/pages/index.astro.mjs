@@ -1,8 +1,8 @@
 import { c as createComponent, r as renderTemplate, m as maybeRenderHead, a as addAttribute, b as createAstro, d as renderComponent } from '../chunks/astro/server_BCQgC0OR.mjs';
 import 'kleur/colors';
-import { $ as $$BaseLayout } from '../chunks/BaseLayout_CdtLeX4R.mjs';
+import { $ as $$BaseLayout } from '../chunks/BaseLayout_DrObJnCT.mjs';
 import 'clsx';
-import { g as getProducts } from '../chunks/server_D_TZjYN_.mjs';
+import { g as getProducts } from '../chunks/server_B6Bxn1q6.mjs';
 export { renderers } from '../renderers.mjs';
 
 const $$Hero = createComponent(async ($$result, $$props, $$slots) => {

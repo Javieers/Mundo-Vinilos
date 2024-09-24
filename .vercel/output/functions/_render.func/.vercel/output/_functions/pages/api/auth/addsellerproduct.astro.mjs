@@ -1,14 +1,13 @@
-import { f as firestore } from '../../../chunks/server_D_TZjYN_.mjs';
+import { f as firestore } from '../../../chunks/server_B6Bxn1q6.mjs';
 export { renderers } from '../../../renderers.mjs';
 
 const POST = async ({ request }) => {
   try {
-    const data = await request.json();
-    const { sellerId, sellerName, productId, price, stock } = data;
-    if (!sellerId || !sellerName || !productId || price == null || stock == null) {
+    const { sellerId, sellerName, productId, price, stock } = await request.json();
+    if (!sellerId || !sellerName || !productId || !price || !stock) {
       return new Response(JSON.stringify({
         status: 400,
-        message: "Faltan datos en la solicitud"
+        message: "Faltan datos para agregar el producto del vendedor"
       }), { status: 400 });
     }
     const sellersRef = firestore.collection("sellers");
@@ -21,14 +20,14 @@ const POST = async ({ request }) => {
     });
     return new Response(JSON.stringify({
       status: 200,
-      message: "Información del vendedor guardada correctamente"
+      message: "Producto del vendedor añadido con éxito"
     }), { status: 200 });
   } catch (error) {
-    console.error("Error al guardar información del vendedor:", error);
+    console.error("Error añadiendo producto del vendedor:", error);
     return new Response(JSON.stringify({
-      status: 500,
+      status: 400,
       message: "Algo salió mal: " + error.message
-    }), { status: 500 });
+    }), { status: 400 });
   }
 };
 
