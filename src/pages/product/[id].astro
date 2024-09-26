@@ -1,7 +1,7 @@
 ---
-// Importamos la función para obtener vendedores y detalles del producto
 import BaseLayout from "../../layouts/BaseLayout.astro";
 import { getProducts, getSellerProductInfo } from '../../firebase/server';
+import Cart from '../../cart/Cart.astro'; 
 
 const { id } = Astro.params;
 const products = await getProducts();
@@ -11,6 +11,40 @@ const sellers = await getSellerProductInfo(id); // Obtenemos la información de 
 if (!product) {
   throw new Error('Producto no encontrado');
 }
+
+// Inicializar el carrito y la variable para controlar la visualización del carrito
+let cart = []; // Inicializamos cart
+let showCartModal = false; // Inicializamos showCartModal
+
+// Función para agregar al carrito
+const addToCart = (sellerData) => {
+  const existingItem = cart.find(item => item.productId === sellerData.productId && item.sellerId === sellerData.sellerId);
+  
+  if (existingItem) {
+    existingItem.quantity += 1; // Incrementar la cantidad si ya existe
+  } else {
+    cart.push({ ...sellerData, quantity: 1 }); // Agregar el vendedor y el producto al carrito
+  }
+  updateCartDisplay(); // Actualizar la visualización del carrito
+};
+
+// Función para mostrar el carrito
+const showCart = () => {
+  showCartModal = true; // Mostrar carrito
+};
+
+// Función para cerrar el carrito
+const closeCart = () => {
+  showCartModal = false; // Cerrar carrito
+};
+
+// Función para actualizar la visualización del carrito
+const updateCartDisplay = () => {
+  const cartCount = document.getElementById('cartCount') as HTMLElement; // Aseguramos el tipo
+  if (cartCount) {
+    cartCount.innerText = cart.length.toString(); // Convertimos a cadena
+  }
+};
 ---
 
 <BaseLayout>
@@ -29,9 +63,18 @@ if (!product) {
         <ul class="mt-4">
           {sellers.length > 0 ? (
             sellers.map(seller => (
-              <li class="border-b py-4">
-              <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
+              <li class="border-b py-4" id={`seller-${seller.sellerId}`}>
+                <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
                 - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
+                
+                {/* Botón para agregar al carrito */}
+                <button 
+                  class="ml-4 bg-blue-600 text-white px-3 py-1 rounded"
+                  id={`buy-${seller.sellerId}`}
+                  data-product-id={product.id}
+                >
+                  Comprar
+                </button>
               </li>
             ))
           ) : (
@@ -40,5 +83,76 @@ if (!product) {
         </ul>
       </div>
     </div>
+
+    {/* Icono del carrito */}
+    <div class="fixed bottom-4 right-4">
+      <button 
+        id="showCartButton" 
+        class="bg-blue-500 text-white rounded-full p-4 flex items-center justify-center"
+      >
+        🛒 <span id="cartCount" class="ml-2 text-lg">0</span>
+      </button>
+    </div>
+
+    {/* Modal del carrito */}
+    {showCartModal && <Cart cart={cart} closeCart={closeCart} />}
   </section>
+
+  <script>
+    // Inicializamos el carrito y la variable para controlar la visualización del carrito
+    let cart = []; // Aseguramos que 'cart' esté definido
+    let showCartModal = false; // Aseguramos que 'showCartModal' esté definido
+
+    // Funciones de gestión del carrito y eventos
+    const addToCart = (sellerData) => {
+      const existingItem = cart.find(item => item.productId === sellerData.productId && item.sellerId === sellerData.sellerId);
+      
+      if (existingItem) {
+        existingItem.quantity += 1; // Incrementar la cantidad si ya existe
+      } else {
+        cart.push({ ...sellerData, quantity: 1 }); // Agregar el vendedor y el producto al carrito
+      }
+      updateCartDisplay(); // Actualizar la visualización del carrito
+    };
+
+    const updateCartDisplay = () => {
+      const cartCount = document.getElementById('cartCount'); // Aseguramos el tipo
+      if (cartCount) {
+        cartCount.innerText = cart.length.toString(); // Convertimos a cadena
+      }
+    };
+
+    // Manejo de eventos para los botones de compra
+    document.querySelectorAll('button[id^="buy-"]').forEach(button => {
+      button.addEventListener('click', (event) => {
+        const sellerId = (event.target as HTMLButtonElement).parentElement.id.split('-')[1]; // Obtener el ID del vendedor
+        const sellerElement = (event.target as HTMLButtonElement).parentElement; // Obtener el nodo padre del vendedor
+        const sellerName = sellerElement.querySelector('a').innerText; // Obtener el nombre del vendedor
+        const price = parseFloat(sellerElement.innerText.split('$')[1].split(' ')[0]); // Obtener el precio
+        
+        const productId = (event.target as HTMLButtonElement).dataset.productId; // Obtener el ID del producto desde el dataset
+        
+        const sellerData = {
+          sellerId: sellerId,
+          sellerName: sellerName,
+          price: price,
+          productId: productId, // Usar el ID del producto obtenido del dataset
+          quantity: 1
+        };
+        addToCart(sellerData); // Agregar al carrito
+      });
+    });
+
+    // Agregar evento al botón de mostrar carrito
+    const showCartButton = document.getElementById('showCartButton');
+    showCartButton.addEventListener('click', () => {
+      showCartModal = !showCartModal; // Alternar la visualización del carrito
+      const cartModal = document.getElementById('cartModal'); // Obtener el modal del carrito
+      if (showCartModal) {
+        cartModal.style.display = 'block'; // Mostrar el carrito
+      } else {
+        cartModal.style.display = 'none'; // Ocultar el carrito
+      }
+    });
+  </script>
 </BaseLayout>
