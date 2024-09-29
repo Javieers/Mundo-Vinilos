@@ -1,0 +1,33 @@
+---
+import { getProducts } from '../../firebase/server';
+const url = new URL(Astro.request.url);
+const sellerId = url.searchParams.get('add');
+const sellerName = url.searchParams.get('name');
+const price = url.searchParams.get('price');
+const productId = url.searchParams.get('productId');
+
+// Aquí podrías cargar más información sobre el producto si es necesario, usando productId
+const products = await getProducts(); // Asegúrate de que esta función esté disponible
+const product = products.find(p => p.id === productId); // Encontramos el producto por ID
+
+---
+  <section class="p-6 flex justify-center items-center">
+    <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+      <h2 class="text-2xl font-bold text-center">Detalles de Compra</h2>
+      
+      {product && (
+        <div class="mt-4 text-center">
+          <img src={product.imageUrl} alt={product.name} class="w-full h-auto max-h-40 object-contain mx-auto mb-4 rounded-md" />
+          <p><strong>Producto:</strong> {product.name}</p>
+          <p><strong>Vendedor:</strong> {sellerName}</p>
+          <p><strong>Precio:</strong> ${price}</p>
+          <p><strong>ID del Producto:</strong> {productId}</p>
+        </div>
+      )}
+
+      <button class="mt-4 bg-green-600 text-white px-4 py-2 rounded w-full">
+        Pagar
+      </button>
+    </div>
+  </section>
+
