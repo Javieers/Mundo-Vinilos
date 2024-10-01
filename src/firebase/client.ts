@@ -1,7 +1,7 @@
 import { initializeApp } from 'firebase/app';
-import { getAnalytics } from 'firebase/analytics';
+import { getAuth } from 'firebase/auth';
 
-// Tus credenciales de la aplicación web
+// Configuración de Firebase (verifica que las credenciales sean correctas)
 const firebaseConfig = {
   apiKey: 'AIzaSyAUZ6nU3sKP6e5lxO5OLh2opflhwo_SKOo',
   authDomain: 'mundo-vinilos.firebaseapp.com',
@@ -13,6 +13,10 @@ const firebaseConfig = {
   measurementId: 'G-GH28GM6EVG'
 };
 
-// Inicializa Firebase
-export const app = initializeApp(firebaseConfig);
-export const analytics = getAnalytics(app);
+// Inicializar Firebase
+const app = initializeApp(firebaseConfig);
+
+// Inicializar Firebase Authentication
+const auth = getAuth(app);
+
+export { app, auth };

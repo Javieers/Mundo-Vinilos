@@ -1,51 +1,44 @@
 import type { APIRoute } from 'astro';
-import { auth, firestore } from '../../../firebase/server';
-import * as bcrypt from 'bcrypt';
+import { app } from '../../../firebase/server';
+import { getAuth } from 'firebase-admin/auth';
 
-export const POST: APIRoute = async ({ request }) => {
+export const POST: APIRoute = async ({ request, cookies, redirect }) => {
+  const auth = getAuth(app);
+
   try {
-    const formData = await request.formData();
-    const email = formData.get('email')?.toString();
-    const password = formData.get('password')?.toString();
-
-    if (!email || !password) {
-      return new Response(JSON.stringify({
-        status: 400,
-        message: 'Faltan datos en el formulario'
-      }), { status: 400 });
+    // Obtener el token de las cabeceras
+    const idToken = request.headers.get('Authorization')?.split('Bearer ')[1];
+    
+    if (!idToken) {
+      return new Response(JSON.stringify({ message: 'Token no encontrado' }), { status: 401 });
     }
 
-    const usersRef = firestore.collection('users');
-    const snapshot = await usersRef.where('email', '==', email).get();
-
-    if (snapshot.empty) {
-      return new Response(JSON.stringify({
-        status: 400,
-        message: 'El usuario no existe'
-      }), { status: 400 });
+    // Verificar el ID del token
+    try {
+      await auth.verifyIdToken(idToken);
+    } catch (error) {
+      return new Response(JSON.stringify({ message: 'Token inválido o expirado' }), { status: 401 });
     }
 
-    const userDoc = snapshot.docs[0];
-    const userData = userDoc.data();
+    // Crear una cookie de sesión que expire en 5 días
+    const fiveDays = 60 * 60 * 24 * 5 * 1000;
+    const sessionCookie = await auth.createSessionCookie(idToken, {
+      expiresIn: fiveDays,
+    });
 
-    const passwordMatch = await bcrypt.compare(password, userData.password);
+    // Guardar la cookie
+    cookies.set('session', sessionCookie, {
+      path: '/',
+      expires: new Date(Date.now() + fiveDays),
+      httpOnly: true,
+      secure: true, // Para mayor seguridad, habilita secure en producción.
+    });
 
-    if (!passwordMatch) {
-      return new Response(JSON.stringify({
-        status: 400,
-        message: 'Contraseña incorrecta'
-      }), { status: 400 });
-    }
+    // Redirigir a la página de perfil
+    return redirect('/perfil');
 
-    return new Response(JSON.stringify({
-      status: 200,
-      message: 'Inicio de sesión exitoso'
-    }), { status: 200 });
-  } catch (error: any) {
-    console.error('Error during user login:', error);
-    return new Response(JSON.stringify({
-      status: 400,
-      message: 'Algo salió mal: ' + error.message
-    }), { status: 400 });
+  } catch (error) {
+    console.error('Error al manejar la solicitud de inicio de sesión:', error);
+    return new Response(JSON.stringify({ message: 'Error en el servidor' }), { status: 500 });
   }
 };

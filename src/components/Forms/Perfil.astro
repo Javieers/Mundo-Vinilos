@@ -1,0 +1,63 @@
+---
+import { getAuth } from 'firebase-admin/auth';
+import { app, firestore } from '../../firebase/server';
+
+const auth = getAuth(app);
+
+// Obtener la cookie de sesión
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+let user = null;
+let purchases = [];
+
+if (sessionCookie) {
+  try {
+    // Verificar y decodificar la cookie de sesión
+    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+    user = decodedClaims;
+
+    const userId = user.uid;
+
+    // Obtener las compras del usuario desde la subcolección 'purchases' dentro de 'users'
+    const purchasesSnapshot = await firestore
+      .collection('users')
+      .doc(userId)
+      .collection('purchases')
+      .get();
+
+    purchases = purchasesSnapshot.docs.map(doc => {
+      const data = doc.data();
+      // Si 'date' es un Timestamp de Firebase, conviértelo a Date de JS
+      if (data.date && data.date.toDate) {
+        data.date = data.date.toDate();
+      }
+      return data;
+    });
+
+  } catch (error) {
+    console.error('Error al obtener el perfil del usuario:', error);
+  }
+} else {
+  // Redirigir al login si no está autenticado
+  return Astro.redirect('/login');
+}
+---
+
+<section class="p-6">
+  <h2 class="text-2xl font-bold">Bienvenido, {user.email}</h2>
+  <h3 class="text-xl font-semibold mt-4">Historial de Compras</h3>
+  {purchases.length > 0 ? (
+    <ul class="mt-2">
+      {purchases.map(purchase => (
+        <li class="border-b py-2">
+          <p><strong>Producto ID:</strong> {purchase.productId}</p>
+          <p><strong>Vendedor:</strong> {purchase.sellerName}</p>
+          <p><strong>Precio:</strong> ${purchase.price}</p>
+          <p><strong>Fecha:</strong> {purchase.date ? purchase.date.toLocaleString() : 'Sin fecha'}</p>
+        </li>
+      ))}
+    </ul>
+  ) : (
+    <p class="mt-2">No tienes compras realizadas.</p>
+  )}
+</section>
