@@ -1,0 +1,76 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro'; // Ajusta la ruta según corresponda
+import { adminAuth } from '../../firebase/server'; // Ajusta la ruta según corresponda
+
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+if (!sessionCookie) {
+  return Astro.redirect('/login');
+}
+
+let user = null;
+
+try {
+  const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+  if (decodedClaims.admin) {
+    user = decodedClaims;
+  } else {
+    // No es administrador, redirigir o mostrar mensaje de acceso denegado
+    return Astro.redirect('/no-autorizado');
+  }
+} catch (error) {
+  console.error('Error al verificar la sesión:', error);
+  return Astro.redirect('/login');
+}
+---
+<BaseLayout>
+  <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+    <h2 class="text-3xl font-bold mb-6 text-center text-blue-600">Asignar Rol de Vendedor</h2>
+    <p class="text-gray-700 mb-8 text-center">Bienvenido, <span class="font-semibold">{user.email}</span></p>
+    <form id="assignSellerForm" class="space-y-6 max-w-md mx-auto">
+      <div>
+        <label for="email" class="block text-sm font-medium text-gray-700">Email del Vendedor:</label>
+        <input type="email" id="email" name="email" required class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:ring-blue-500 focus:border-blue-500" placeholder="correo@ejemplo.com" />
+      </div>
+      <button type="submit" class="w-full bg-blue-600 text-white px-4 py-3 rounded-md font-semibold hover:bg-blue-700 transition duration-200">
+        Asignar Rol de Vendedor
+      </button>
+    </form>
+  </section>
+
+  <script>
+    document.getElementById('assignSellerForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const emailElement = document.getElementById('email') as HTMLInputElement;
+
+      if (!emailElement) {
+        alert('No se pudo encontrar el campo de email.');
+        return;
+      }
+
+      const email = emailElement.value;
+
+      try {
+        const response = await fetch('/api/setSellerClaim', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          alert(result.message);
+          // Opcionalmente, puedes limpiar el campo de email
+          emailElement.value = '';
+        } else {
+          alert('Error: ' + result.message);
+        }
+      } catch (error) {
+        console.error('Error al asignar el rol de vendedor:', error);
+        alert('Error al asignar el rol de vendedor');
+      }
+    });
+  </script>
+</BaseLayout>

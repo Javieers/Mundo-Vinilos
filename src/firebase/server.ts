@@ -1,42 +1,38 @@
+// server.ts
+
 import 'dotenv/config';
-import type { ServiceAccount } from 'firebase-admin';
-import { initializeApp, cert, getApps } from 'firebase-admin/app';
-import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
-import { getStorage } from 'firebase-admin/storage';
+import admin from 'firebase-admin';
 import express from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 
-// Verifica que las variables de entorno estén definidas
+// Verificar que las variables de entorno estén definidas
 if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
   throw new Error('Faltan variables de entorno necesarias para Firebase');
 }
 
-// Credenciales del servicio
-const serviceAccount: ServiceAccount = {
-  projectId: process.env.FIREBASE_PROJECT_ID,
-  privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
-  clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
-};
-
-// Inicializa la aplicación Firebase si no está ya inicializada
-let app;
-if (!getApps().length) {
-  app = initializeApp({
-    credential: cert(serviceAccount),
-    storageBucket: 'YOUR_STORAGE_BUCKET',
+// Inicializar Firebase Admin SDK si no está inicializado
+if (!admin.apps.length) {
+  admin.initializeApp({
+    credential: admin.credential.cert({
+      projectId: process.env.FIREBASE_PROJECT_ID,
+      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+      clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+    }),
+    storageBucket: 'YOUR_STORAGE_BUCKET', // Reemplaza con tu bucket de almacenamiento si es necesario
   });
-} else {
-  app = getApps()[0];
 }
 
-const auth = getAuth(app);
-const firestore = getFirestore(app);
-const storage = getStorage().bucket();
+// Exportar instancias del Admin SDK
+export const adminAuth = admin.auth();
+export const adminFirestore = admin.firestore();
+export const adminStorage = admin.storage().bucket(); // Si usas Cloud Storage
 
+// Configuración de Express
 const expressApp = express();
 expressApp.use(cors());
 expressApp.use(express.json());
+expressApp.use(cookieParser()); // Para manejar cookies
 
 // Ruta para iniciar sesión actualizada
 expressApp.post('/api/auth/signin', async (req, res) => {
@@ -50,20 +46,21 @@ expressApp.post('/api/auth/signin', async (req, res) => {
     // Verificar el ID Token
     let decodedToken;
     try {
-      decodedToken = await auth.verifyIdToken(idToken);
+      decodedToken = await adminAuth.verifyIdToken(idToken);
     } catch (error) {
       return res.status(401).json({ message: 'Token inválido o expirado' });
     }
 
     // Crear una cookie de sesión que expire en 5 días
     const expiresIn = 60 * 60 * 24 * 5 * 1000; // 5 días en milisegundos
-    const sessionCookie = await auth.createSessionCookie(idToken, { expiresIn });
+    const sessionCookie = await adminAuth.createSessionCookie(idToken, { expiresIn });
 
     // Opciones de la cookie
     const options = {
       maxAge: expiresIn,
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production', // Asegúrate de usar HTTPS en producción
+      path: '/', // Asegura que la cookie esté disponible en todas las rutas
     };
 
     // Establecer la cookie en la respuesta
@@ -77,7 +74,7 @@ expressApp.post('/api/auth/signin', async (req, res) => {
   }
 });
 
-// Ruta para cerrar sesión (opcional)
+// Ruta para cerrar sesión
 expressApp.post('/api/auth/signout', async (req, res) => {
   try {
     // Elimina la cookie de sesión
@@ -95,7 +92,7 @@ expressApp.get('/api/user', async (req, res) => {
 
   try {
     // Verificar la cookie de sesión
-    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
 
     // Obtener información del usuario desde Firestore
     const user = await getUserByEmail(decodedClaims.email);
@@ -117,18 +114,30 @@ expressApp.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
 
+// Funciones auxiliares
+
 // Obtener todos los productos disponibles en la colección 'products'
-async function getProducts() {
-  const querySnapshot = await firestore.collection('products').get();
-  const products = [];
-  querySnapshot.forEach((doc) => {
-    products.push({ id: doc.id, ...doc.data() });
-  });
-  return products;
+export async function getProducts() {
+  try {
+    const querySnapshot = await adminFirestore.collection('products').get();
+    const products = [];
+    querySnapshot.forEach((doc) => {
+      products.push({ id: doc.id, ...doc.data() });
+    });
+    return products;
+  } catch (error) {
+    console.error('Error obteniendo productos:', error);
+    throw new Error('Error al obtener productos');
+  }
 }
 
 // Guardar información del producto para un vendedor en la subcolección 'products'
-export async function saveSellerProductInfo(sellerId: string, productId: string, price: number, stock: number) {
+export async function saveSellerProductInfo(
+  sellerId: string,
+  productId: string,
+  price: number,
+  stock: number
+) {
   try {
     const productData = {
       productId,
@@ -136,7 +145,11 @@ export async function saveSellerProductInfo(sellerId: string, productId: string,
       stock,
     };
 
-    const productRef = firestore.collection('sellers').doc(sellerId).collection('products').doc(productId);
+    const productRef = adminFirestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('products')
+      .doc(productId);
     await productRef.set(productData);
 
     console.log(`Producto ${productId} guardado para el vendedor ${sellerId}`);
@@ -147,34 +160,40 @@ export async function saveSellerProductInfo(sellerId: string, productId: string,
   }
 }
 
-// Obtener precios y stock de productos para un vendedor específico
-export async function getSellerProductInfo(productId: string) {
+export async function getSellerProductInfo(productId) {
   try {
-    const sellersRef = firestore.collection('sellers');
-    const snapshot = await sellersRef.get();
+    // Obtener todos los vendedores
+    const sellersSnapshot = await adminFirestore.collection('sellers').get();
 
-    const sellersWithProduct = [];
+    const sellers = [];
 
-    for (const doc of snapshot.docs) {
-      const sellerId = doc.id;
-      const productSnapshot = await sellersRef.doc(sellerId).collection('products').where('productId', '==', productId).get();
+    for (const sellerDoc of sellersSnapshot.docs) {
+      const sellerId = sellerDoc.id;
+      const sellerData = sellerDoc.data();
+      const sellerName = sellerData.name || 'Vendedor Anónimo';
 
-      if (!productSnapshot.empty) {
-        productSnapshot.forEach((productDoc) => {
-          const productData = productDoc.data();
-          sellersWithProduct.push({
-            sellerId: sellerId,
-            sellerName: doc.data().sellerName,
-            price: productData.price,
-            stock: productData.stock,
-          });
+      // Verificar si el vendedor tiene el producto
+      const productDoc = await adminFirestore
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('products')
+        .doc(productId)
+        .get();
+
+      if (productDoc.exists) {
+        const productData = productDoc.data();
+        sellers.push({
+          sellerId,
+          sellerName,
+          price: productData.price,
+          stock: productData.stock,
         });
       }
     }
 
-    return sellersWithProduct;
+    return sellers;
   } catch (error) {
-    console.error('Error obteniendo información de vendedores:', error);
+    console.error('Error al obtener la información de los vendedores:', error);
     return [];
   }
 }
@@ -182,7 +201,7 @@ export async function getSellerProductInfo(productId: string) {
 // Obtener información de un vendedor específico junto con los productos que vende
 export async function getSellerInfo(sellerId: string) {
   try {
-    const sellerRef = firestore.collection('sellers').doc(sellerId);
+    const sellerRef = adminFirestore.collection('sellers').doc(sellerId);
     const sellerSnapshot = await sellerRef.get();
 
     if (!sellerSnapshot.exists) {
@@ -196,7 +215,7 @@ export async function getSellerInfo(sellerId: string) {
       productSnapshot.docs.map(async (doc) => {
         const productId = doc.id;
         const sellerProductData = doc.data();
-        const productDoc = await firestore.collection('products').doc(productId).get();
+        const productDoc = await adminFirestore.collection('products').doc(productId).get();
 
         if (!productDoc.exists) {
           return {
@@ -211,9 +230,9 @@ export async function getSellerInfo(sellerId: string) {
           productId,
           price: sellerProductData.price,
           stock: sellerProductData.stock,
-          name: productDoc.data().name,
-          description: productDoc.data().description,
-          imageUrl: productDoc.data().imageUrl,
+          name: productDoc.data()?.name,
+          description: productDoc.data()?.description,
+          imageUrl: productDoc.data()?.imageUrl,
         };
       })
     );
@@ -235,7 +254,7 @@ export async function getSellerInfo(sellerId: string) {
 // Obtener las órdenes de un usuario por su ID
 export async function getUserOrders(userId: string): Promise<any[]> {
   try {
-    const ordersSnapshot = await firestore.collection('orders').where('userId', '==', userId).get();
+    const ordersSnapshot = await adminFirestore.collection('orders').where('userId', '==', userId).get();
 
     return ordersSnapshot.docs.map((doc) => ({
       id: doc.id,
@@ -250,7 +269,7 @@ export async function getUserOrders(userId: string): Promise<any[]> {
 // Función para obtener información del usuario por email
 export async function getUserByEmail(email: string): Promise<any | null> {
   try {
-    const usersCollection = firestore.collection('users');
+    const usersCollection = adminFirestore.collection('users');
     const userSnapshot = await usersCollection.where('email', '==', email).get();
 
     if (userSnapshot.empty) {
@@ -272,4 +291,5 @@ export async function getUserByEmail(email: string): Promise<any | null> {
   }
 }
 
-export { auth, firestore, getProducts, app, expressApp };
+// Exportar las instancias y funciones necesarias
+export { expressApp };

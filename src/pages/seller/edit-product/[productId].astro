@@ -1,6 +1,8 @@
 ---
-import BaseLayout from '../../layouts/BaseLayout.astro';
-import { adminAuth, adminFirestore } from '../../firebase/server';
+import BaseLayout from '../../../layouts/BaseLayout.astro';
+import { adminAuth, adminFirestore } from '../../../firebase/server';
+
+const { productId } = Astro.params;
 
 const sessionCookie = Astro.cookies.get('session')?.value;
 
@@ -8,20 +10,29 @@ if (!sessionCookie) {
   return Astro.redirect('/login');
 }
 
-interface Product {
-  id: string;
-  name: string;
-  imageUrl?: string;
-  description?: string;
-}
-
 let user = null;
+let product = null;
 
 try {
   const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
 
   if (decodedClaims.seller) {
     user = decodedClaims;
+    const sellerId = user.uid;
+
+    // Obtener el producto del vendedor
+    const productDoc = await adminFirestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('products')
+      .doc(productId)
+      .get();
+
+    if (productDoc.exists) {
+      product = { id: productDoc.id, ...productDoc.data() };
+    } else {
+      return Astro.redirect('/seller/dashboard');
+    }
   } else {
     return Astro.redirect('/no-autorizado');
   }
@@ -29,29 +40,15 @@ try {
   console.error('Error al verificar la sesión:', error);
   return Astro.redirect('/login');
 }
-
-// Obtener la lista de productos disponibles
-const productsSnapshot = await adminFirestore.collection('products').get();
-const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(doc.data() as Product) }));
 ---
 <BaseLayout>
   <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
-    <h2 class="text-2xl font-bold mb-6">Asignar Producto a Vendedor</h2>
-    <form id="assignProductForm" class="space-y-6">
-      <!-- Selección de Producto -->
+    <h2 class="text-2xl font-bold mb-6">Editar Producto</h2>
+    <form id="editProductForm" class="space-y-6">
+      <!-- Mostrar el nombre del producto -->
       <div>
-        <label for="product" class="block text-sm font-medium text-gray-700">Selecciona un Producto</label>
-        <select
-          id="product"
-          name="product"
-          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
-          required
-        >
-          <option value="">Selecciona un producto</option>
-          {products.map((product) => (
-            <option value={product.id}>{product.name}</option>
-          ))}
-        </select>
+        <label class="block text-sm font-medium text-gray-700">Producto</label>
+        <p class="mt-1 text-gray-900">{product.name}</p>
       </div>
 
       <!-- Campo para el Precio -->
@@ -63,6 +60,7 @@ const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(
           name="price"
           min="0"
           step="0.01"
+          value={product.price}
           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
           required
         />
@@ -77,6 +75,7 @@ const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(
           name="stock"
           min="0"
           step="1"
+          value={product.stock}
           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
           required
         />
@@ -88,37 +87,35 @@ const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(
           type="submit"
           class="w-full bg-blue-600 text-white px-4 py-3 rounded-md font-semibold hover:bg-blue-700 transition duration-200"
         >
-          Asignar Producto
+          Guardar Cambios
         </button>
       </div>
     </form>
   </section>
 
   <script>
-    document.getElementById('assignProductForm').addEventListener('submit', async (event) => {
+    document.getElementById('editProductForm').addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const productSelect = document.getElementById('product') as HTMLSelectElement;
       const priceInput = document.getElementById('price') as HTMLInputElement;
       const stockInput = document.getElementById('stock') as HTMLInputElement;
 
-      const productId = productSelect.value;
       const price = parseFloat(priceInput.value);
       const stock = parseInt(stockInput.value, 10);
 
-      if (!productId || isNaN(price) || isNaN(stock)) {
+      if (isNaN(price) || isNaN(stock)) {
         alert('Por favor completa todos los campos correctamente.');
         return;
       }
 
       try {
-        const response = await fetch('/api/seller/assign-product', {
+        const response = await fetch('/api/seller/edit-product', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            productId,
+            productId: '{product.id}',
             price,
             stock,
           }),
@@ -127,15 +124,15 @@ const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(
         const result = await response.json();
 
         if (response.ok) {
-          alert('Producto asignado correctamente');
+          alert('Producto actualizado correctamente');
           // Redirigir al panel de vendedor
           window.location.href = '/seller/dashboard';
         } else {
           alert('Error: ' + result.message);
         }
       } catch (error) {
-        console.error('Error al asignar el producto:', error);
-        alert('Error al asignar el producto');
+        console.error('Error al actualizar el producto:', error);
+        alert('Error al actualizar el producto');
       }
     });
   </script>

@@ -36,8 +36,8 @@ const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(
 ---
 <BaseLayout>
   <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
-    <h2 class="text-2xl font-bold mb-6">Asignar Producto a Vendedor</h2>
-    <form id="assignProductForm" class="space-y-6">
+    <h2 class="text-2xl font-bold mb-6">Agregar Producto</h2>
+    <form id="addProductForm" class="space-y-6">
       <!-- Selección de Producto -->
       <div>
         <label for="product" class="block text-sm font-medium text-gray-700">Selecciona un Producto</label>
@@ -88,54 +88,62 @@ const products: Product[] = productsSnapshot.docs.map(doc => ({ id: doc.id, ...(
           type="submit"
           class="w-full bg-blue-600 text-white px-4 py-3 rounded-md font-semibold hover:bg-blue-700 transition duration-200"
         >
-          Asignar Producto
+          Agregar Producto
         </button>
       </div>
     </form>
   </section>
 
   <script>
-    document.getElementById('assignProductForm').addEventListener('submit', async (event) => {
+    document.getElementById('addProductForm').addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const productSelect = document.getElementById('product') as HTMLSelectElement;
-      const priceInput = document.getElementById('price') as HTMLInputElement;
-      const stockInput = document.getElementById('stock') as HTMLInputElement;
+      const productSelect = document.getElementById('product');
+      const priceInput = document.getElementById('price');
+      const stockInput = document.getElementById('stock');
 
-      const productId = productSelect.value;
-      const price = parseFloat(priceInput.value);
-      const stock = parseInt(stockInput.value, 10);
+      if (
+        productSelect instanceof HTMLSelectElement &&
+        priceInput instanceof HTMLInputElement &&
+        stockInput instanceof HTMLInputElement
+      ) {
+        const productId = productSelect.value;
+        const price = parseFloat(priceInput.value);
+        const stock = parseInt(stockInput.value, 10);
 
-      if (!productId || isNaN(price) || isNaN(stock)) {
-        alert('Por favor completa todos los campos correctamente.');
-        return;
-      }
-
-      try {
-        const response = await fetch('/api/seller/assign-product', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            productId,
-            price,
-            stock,
-          }),
-        });
-
-        const result = await response.json();
-
-        if (response.ok) {
-          alert('Producto asignado correctamente');
-          // Redirigir al panel de vendedor
-          window.location.href = '/seller/dashboard';
-        } else {
-          alert('Error: ' + result.message);
+        if (!productId || isNaN(price) || isNaN(stock)) {
+          alert('Por favor completa todos los campos correctamente.');
+          return;
         }
-      } catch (error) {
-        console.error('Error al asignar el producto:', error);
-        alert('Error al asignar el producto');
+
+        try {
+          const response = await fetch('/api/seller/add-product', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              productId,
+              price,
+              stock,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert('Producto agregado correctamente');
+            // Redirigir al panel de vendedor
+            window.location.href = '/seller/dashboard';
+          } else {
+            alert('Error: ' + result.message);
+          }
+        } catch (error) {
+          console.error('Error al agregar el producto:', error);
+          alert('Error al agregar el producto');
+        }
+      } else {
+        alert('No se pudieron obtener los valores del formulario.');
       }
     });
   </script>

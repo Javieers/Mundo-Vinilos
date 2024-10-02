@@ -1,19 +1,13 @@
 ---
-import { getProducts } from '../../firebase/server';
-import { getAuth } from 'firebase-admin/auth';
-import { app, firestore } from '../../firebase/server'; // Asegúrate de ajustar la ruta si es necesario
+import { adminAuth, adminFirestore } from '../../firebase/server';
 
-const auth = getAuth(app);
-
-// Obtener la cookie de sesión
 const sessionCookie = Astro.cookies.get('session')?.value;
 
 let user = null;
 
 if (sessionCookie) {
   try {
-    // Verificar y decodificar la cookie de sesión
-    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
+    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
     user = decodedClaims;
   } catch (error) {
     console.error('Error al verificar la cookie de sesión:', error);
@@ -21,48 +15,116 @@ if (sessionCookie) {
 }
 
 const url = new URL(Astro.request.url);
-const sellerId = url.searchParams.get('add');
-const sellerName = url.searchParams.get('name');
-const price = url.searchParams.get('price');
 const productId = url.searchParams.get('productId');
+const sellerId = url.searchParams.get('sellerId');
+const sellerName = url.searchParams.get('sellerName');
+const price = parseFloat(url.searchParams.get('price') || '0');
 
-// Cargar información del producto
-const products = await getProducts(); // Asegúrate de que esta función esté disponible
-const product = products.find(p => p.id === productId); // Encontramos el producto por ID
+let product = null;
 
-// No redirigimos aquí; manejaremos el caso en el componente
+// Obtener el producto desde Firestore
+try {
+  const productDoc = await adminFirestore.collection('products').doc(productId).get();
+  if (productDoc.exists) {
+    product = { id: productDoc.id, ...productDoc.data() };
+  } else {
+    console.error('Producto no encontrado en Firestore');
+  }
+} catch (error) {
+  console.error('Error al obtener el producto:', error);
+}
 ---
-<section class="p-6 flex justify-center items-center">
-  <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
-    <h2 class="text-2xl font-bold text-center">Detalles de Compra</h2>
-    
-    {product && (
-      <div class="mt-4 text-center">
-        <img src={product.imageUrl} alt={product.name} class="w-full h-auto max-h-40 object-contain mx-auto mb-4 rounded-md" />
-        <p><strong>Producto:</strong> {product.name}</p>
-        <p><strong>Vendedor:</strong> {sellerName}</p>
-        <p><strong>Precio:</strong> ${price}</p>
-        <p><strong>ID del Producto:</strong> {productId}</p>
-      </div>
-    )}
+  <section class="p-6 flex justify-center items-center">
+    <div class="bg-white p-6 rounded-lg shadow-md w-full max-w-md">
+      <h2 class="text-2xl font-bold text-center">Detalles de Compra</h2>
 
-    {user ? (
-      // Si el usuario está autenticado, mostramos el botón "Pagar"
-      <form action="/api/purchase" method="POST">
-        <input type="hidden" name="productId" value={productId} />
-        <input type="hidden" name="sellerId" value={sellerId} />
-        <input type="hidden" name="sellerName" value={sellerName} />
-        <input type="hidden" name="price" value={price} />
-        <button type="submit" class="mt-4 bg-green-600 text-white px-4 py-2 rounded w-full">
-          Pagar
-        </button>
-      </form>
-    ) : (
-      // Si el usuario no está autenticado, mostramos un mensaje y un enlace al login
-      <div class="mt-4 text-center">
-        <p class="text-red-600 font-semibold">Debes iniciar sesión para realizar la compra.</p>
-        <a href="/login" class="mt-2 inline-block bg-blue-500 text-white px-4 py-2 rounded">Iniciar sesión</a>
-      </div>
-    )}
-  </div>
-</section>
+      {product ? (
+        <div class="mt-4 text-center">
+          <img src={product.imageUrl} alt={product.name} class="w-full h-auto max-h-40 object-contain mx-auto mb-4 rounded-md" />
+          <p><strong>Producto:</strong> {product.name}</p>
+          <p><strong>Vendedor:</strong> {sellerName}</p>
+          <p><strong>Precio:</strong> ${price.toFixed(2)}</p>
+        </div>
+      ) : (
+        <p class="text-red-600 font-semibold">Producto no encontrado.</p>
+      )}
+
+      {user ? (
+        // Si el usuario está autenticado, mostramos el botón "Pagar"
+        <form id="purchaseForm" class="mt-4">
+          <input type="hidden" name="productId" value={productId} />
+          <input type="hidden" name="sellerId" value={sellerId} />
+          <input type="hidden" name="price" value={price} />
+          <input type="hidden" name="quantity" value="1" />
+          <button type="submit" class="mt-4 bg-green-600 text-white px-4 py-2 rounded w-full">
+            Pagar
+          </button>
+        </form>
+      ) : (
+        // Si el usuario no está autenticado, mostramos un mensaje y un enlace al login
+        <div class="mt-4 text-center">
+          <p class="text-red-600 font-semibold">Debes iniciar sesión para realizar la compra.</p>
+          <a href="/login" class="mt-2 inline-block bg-blue-500 text-white px-4 py-2 rounded">Iniciar sesión</a>
+        </div>
+      )}
+    </div>
+  </section>
+
+  <script>
+    document.getElementById('purchaseForm')?.addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const productIdInput = document.querySelector('input[name="productId"]');
+      const sellerIdInput = document.querySelector('input[name="sellerId"]');
+      const priceInput = document.querySelector('input[name="price"]');
+      const quantityInput = document.querySelector('input[name="quantity"]');
+
+      if (
+        productIdInput instanceof HTMLInputElement &&
+        sellerIdInput instanceof HTMLInputElement &&
+        priceInput instanceof HTMLInputElement &&
+        quantityInput instanceof HTMLInputElement
+      ) {
+        const productId = productIdInput.value;
+        const sellerId = sellerIdInput.value;
+        const price = parseFloat(priceInput.value);
+        const quantity = parseInt(quantityInput.value, 10);
+
+        if (isNaN(price) || isNaN(quantity)) {
+          alert('El precio y la cantidad deben ser valores numéricos válidos.');
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/purchase', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              productId,
+              sellerId,
+              price,
+              quantity,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert('Compra realizada con éxito');
+            // Redirigir a una página de confirmación o al inicio
+            window.location.href = '/';
+          } else {
+            alert('Error: ' + result.message);
+          }
+        } catch (error) {
+          console.error('Error al realizar la compra:', error);
+          alert('Error al realizar la compra');
+        }
+      } else {
+        alert('Error al obtener los datos del formulario.');
+      }
+    });
+  </script>
+

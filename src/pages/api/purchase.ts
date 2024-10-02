@@ -1,53 +1,94 @@
 // src/pages/api/purchase.ts
+
 import type { APIRoute } from 'astro';
-import { getAuth } from 'firebase-admin/auth';
-import { app, firestore } from '../../firebase/server';
+import { adminAuth, adminFirestore } from '../../firebase/server';
+import { FieldValue } from 'firebase-admin/firestore';
 
-export const POST: APIRoute = async ({ request, cookies, redirect }) => {
-  const auth = getAuth(app);
-
-  // Obtener la cookie de sesión
+export const POST: APIRoute = async ({ request, cookies }) => {
   const sessionCookie = cookies.get('session')?.value;
 
   if (!sessionCookie) {
-    return new Response('No autorizado', { status: 401 });
+    return new Response(JSON.stringify({ message: 'No autorizado' }), {
+      status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   try {
-    // Verificar y decodificar la cookie de sesión
-    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-    const userId = decodedClaims.uid;
+    // Verificar la cookie de sesión
+    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
 
-    // Obtener los datos del formulario
-    const formData = await request.formData();
-    const productId = formData.get('productId') as string;
-    const sellerId = formData.get('sellerId') as string;
-    const sellerName = formData.get('sellerName') as string;
-    const price = formData.get('price') as string;
-
-    // Validar los datos recibidos
-    if (!productId || !sellerId || !price) {
-      return new Response('Datos incompletos', { status: 400 });
+    if (!decodedClaims) {
+      return new Response(JSON.stringify({ message: 'Sesión inválida' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
     }
 
-    // Crear el objeto de compra
-    const purchaseData = {
-      userId,
-      productId,
-      sellerId,
-      sellerName,
-      price: parseFloat(price),
-      date: new Date(), // Guarda la fecha como Date de JS
-    };
+    const userId = decodedClaims.uid;
 
-    // Guardar la compra en la subcolección 'purchases' dentro del usuario
-    await firestore.collection('users').doc(userId).collection('purchases').add(purchaseData);
+    // Obtener los datos de la solicitud
+    const { productId, sellerId, price, quantity } = await request.json();
 
-    // Redirigir al usuario al perfil o a una página de confirmación
-    return redirect('/perfil');
+    // Validar los datos recibidos
+    if (!productId || !sellerId || typeof price !== 'number' || typeof quantity !== 'number') {
+      return new Response(JSON.stringify({ message: 'Datos de compra inválidos' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
 
-  } catch (error) {
+    // Referencias a Firestore
+    const productRef = adminFirestore.collection('products').doc(productId);
+    const sellerProductRef = adminFirestore.collection('sellers').doc(sellerId).collection('products').doc(productId);
+    const userPurchasesRef = adminFirestore.collection('users').doc(userId).collection('purchases');
+
+    // Ejecutar la compra en una transacción para asegurar la consistencia
+    await adminFirestore.runTransaction(async (transaction) => {
+      const productDoc = await transaction.get(productRef);
+      const sellerProductDoc = await transaction.get(sellerProductRef);
+
+      if (!productDoc.exists) {
+        throw new Error('Producto no encontrado');
+      }
+
+      if (!sellerProductDoc.exists) {
+        throw new Error('El vendedor no ofrece este producto');
+      }
+
+      const sellerProductData = sellerProductDoc.data();
+
+      if (sellerProductData.stock < quantity) {
+        throw new Error('Stock insuficiente del vendedor');
+      }
+
+      // Actualizar el stock del vendedor
+      transaction.update(sellerProductRef, {
+        stock: FieldValue.increment(-quantity),
+      });
+
+      // Registrar la compra en la subcolección de compras del usuario
+      const purchaseData = {
+        productId: productId,
+        sellerId: sellerId,
+        price: price,
+        quantity: quantity,
+        total: price * quantity,
+        purchasedAt: FieldValue.serverTimestamp(),
+      };
+
+      transaction.set(userPurchasesRef.doc(), purchaseData);
+    });
+
+    return new Response(JSON.stringify({ message: 'Compra realizada con éxito' }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  } catch (error: any) {
     console.error('Error al procesar la compra:', error);
-    return new Response('Error al procesar la compra', { status: 500 });
+    return new Response(JSON.stringify({ message: `Error al procesar la compra: ${error.message}` }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 };

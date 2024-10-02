@@ -1,6 +1,5 @@
-// mundo-vinilos/absolute-antimatter/src/pages/api/auth/addSellerProduct.ts
 import type { APIRoute } from 'astro';
-import { firestore } from '../../../firebase/server';
+import { adminFirestore } from '../../../firebase/server';
 
 export const POST: APIRoute = async ({ request }) => {
   try {
@@ -13,14 +12,25 @@ export const POST: APIRoute = async ({ request }) => {
       }), { status: 400 });
     }
 
-    const sellersRef = firestore.collection('sellers');
-    await sellersRef.add({
-      sellerId,
-      sellerName,
+    // Añadir o actualizar el producto en la subcolección del vendedor
+    const sellerProductRef = adminFirestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('products')
+      .doc(productId);
+
+    await sellerProductRef.set({
       productId,
       price,
       stock,
     });
+
+    // Actualizar información del vendedor si es necesario
+    const sellerRef = adminFirestore.collection('sellers').doc(sellerId);
+    await sellerRef.set({
+      sellerId,
+      sellerName,
+    }, { merge: true });
 
     return new Response(JSON.stringify({
       status: 200,

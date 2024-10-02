@@ -5,11 +5,13 @@ import { getProducts, getSellerProductInfo } from '../../firebase/server';
 const { id } = Astro.params;
 const products = await getProducts();
 const product = products.find(p => p.id === id);
-const sellers = await getSellerProductInfo(id);
 
 if (!product) {
   throw new Error('Producto no encontrado');
 }
+
+// Obtener información de los vendedores que ofrecen este producto
+const sellers = await getSellerProductInfo(id);
 ---
 
 <BaseLayout>
@@ -19,8 +21,6 @@ if (!product) {
         <img src={product.imageUrl} alt={product.name} class="w-full h-auto max-h-96 object-contain rounded-md" />
         <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
         <p class="mt-2 text-gray-600">{product.description}</p>
-        <p class="mt-2 text-gray-800 font-bold">${product.price}</p>
-        <p class="mt-2 text-gray-600">Stock: {product.stock}</p>
       </div>
 
       <div class="mt-12">
@@ -33,12 +33,14 @@ if (!product) {
                 - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
                 
                 {/* Enlace para comprar que lleva a CartPage con parámetros */}
-                <a 
-                  class="ml-4 bg-blue-600 text-white px-3 py-1 rounded"
-                  href={`/cartpage?add=${seller.sellerId}&name=${seller.sellerName}&price=${seller.price}&productId=${product.id}`}
-                >
-                  Comprar
-                </a>
+                {seller.stock > 0 && (
+                  <a 
+                    class="ml-4 bg-blue-600 text-white px-3 py-1 rounded"
+                    href={`/cartpage?productId=${product.id}&sellerId=${seller.sellerId}&sellerName=${encodeURIComponent(seller.sellerName)}&price=${seller.price}`}
+                  >
+                    Comprar
+                  </a>
+                )}
               </li>
             ))
           ) : (

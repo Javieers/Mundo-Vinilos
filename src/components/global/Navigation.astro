@@ -1,30 +1,33 @@
 ---
-import { getAuth } from 'firebase-admin/auth';
-import { app } from '../../firebase/server'; // Ajusta la ruta según corresponda
+import { adminAuth } from '../../firebase/server'; // Ajusta la ruta según corresponda
 
-const auth = getAuth(app);
+const auth = adminAuth;
 
 const sessionCookie = Astro.cookies.get('session')?.value;
 
 let user = null;
+let isAdmin = false;
+let isSeller = false;
 
 if (sessionCookie) {
   try {
     const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
     user = decodedClaims;
+    isAdmin = decodedClaims.admin || false;
+    isSeller = decodedClaims.seller || false;
   } catch (error) {
     console.error('Error al verificar la cookie de sesión:', error);
   }
 }
 ---
-
 <section class="bg-white border-b border-black/5">
   <div class="w-full mx-auto md:px-12 px-8 max-w-7xl lg:px-16">
     <div
       x-data="{ open: false }"
       class="relative flex flex-col w-full py-5 mx-auto bg-white md:items-center md:justify-between md:flex-row md:px-6">
       <div class="flex flex-row items-center justify-between lg:justify-start">
-        <a href="/" class=" text-black inline-flex items-center gap-3">
+        <a href="/" class="text-black inline-flex items-center gap-3">
+          <!-- Logo y nombre -->
           <svg class="h-4" viewBox="0 0 78 32" fill="none" xmlns="http://www.w3.org/2000/svg">
             <path d="M55.5 0H77.5L58.5 32H36.5L55.5 0Z" class="ccustom" fill="#283CFF"></path>
             <path d="M35.5 0H51.5L32.5 32H16.5L35.5 0Z" class="ccompli1" fill="#5263FF"></path>
@@ -63,6 +66,23 @@ if (sessionCookie) {
           Preguntas frecuentes
         </a>
 
+        {isAdmin && (
+          <a class="px-2 lg:px-6 py-2 md:px-3 text-sm font-medium text-black hover:text-accent-400" href="/admin/AssignSellerRole">
+            Asignar Rol de Vendedor
+          </a>
+        )}
+
+        {isSeller && (
+          <>
+            <a class="px-2 lg:px-6 py-2 md:px-3 text-sm font-medium text-black hover:text-accent-400" href="/seller/dashboard">
+              Panel de Vendedor
+            </a>
+            <a class="px-2 lg:px-6 py-2 md:px-3 text-sm font-medium text-black hover:text-accent-400" href="/seller/profile">
+              Mi Perfil
+            </a>
+          </>
+        )}
+
         <div class="inline-flex items-center gap-2 list-none lg:ml-auto">
           {user ? (
             <>
@@ -78,7 +98,7 @@ if (sessionCookie) {
           ) : (
             <>
               <a href="/signup" class="block px-4 py-2 mt-2 text-sm font-medium text-black md:mt-0 hover:text-accent-400 focus:outline-none focus:shadow-outline">
-                Registrate
+                Regístrate
               </a>
               <a href="/login" class="inline-flex items-center h-8 justify-center px-4 py-2 text-sm font-medium text-black bg-gray-100 rounded-lg group focus:outline-none focus-visible:outline-2 focus-visible:outline-offset-2 hover:bg-gray-50 active:bg-gray-200 active:text-accent-400 focus-visible:outline-black">
                 Iniciar Sesión

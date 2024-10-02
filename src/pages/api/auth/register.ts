@@ -1,5 +1,6 @@
+// src/pages/api/auth/register.ts
 import type { APIRoute } from 'astro';
-import { auth, firestore } from '../../../firebase/server';
+import { adminAuth, adminFirestore } from '../../../firebase/server';
 import * as bcrypt from 'bcrypt';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -17,7 +18,7 @@ export const POST: APIRoute = async ({ request }) => {
       }), { status: 400 });
     }
 
-    const usersRef = firestore.collection('users');
+    const usersRef = adminFirestore.collection('users');
     const snapshot = await usersRef.where('email', '==', email).get();
 
     if (!snapshot.empty) {
@@ -29,7 +30,7 @@ export const POST: APIRoute = async ({ request }) => {
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const userRecord = await auth.createUser({
+    const userRecord = await adminAuth.createUser({
       email,
       password,
       displayName: firstName
@@ -47,7 +48,7 @@ export const POST: APIRoute = async ({ request }) => {
       message: 'Usuario creado con éxito'
     }), { status: 200 });
   } catch (error: any) {
-    console.error('Error during user registration:', error);
+    console.error('Error durante el registro del usuario:', error);
     return new Response(JSON.stringify({
       status: 400,
       message: 'Algo salió mal: ' + error.message

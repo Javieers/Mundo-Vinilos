@@ -1,63 +1,92 @@
 ---
-import { getAuth } from 'firebase-admin/auth';
-import { app, firestore } from '../../firebase/server';
+import { adminAuth, adminFirestore } from '../../firebase/server'; // Ajusta la ruta si es necesario
 
-const auth = getAuth(app);
+interface UserData {
+  firstName?: string;
+  email: string;
+}
 
-// Obtener la cookie de sesión
 const sessionCookie = Astro.cookies.get('session')?.value;
 
-let user = null;
+if (!sessionCookie) {
+  return Astro.redirect('/login');
+}
+
+let userId: string;
+let userData: UserData;
 let purchases = [];
 
-if (sessionCookie) {
-  try {
-    // Verificar y decodificar la cookie de sesión
-    const decodedClaims = await auth.verifySessionCookie(sessionCookie, true);
-    user = decodedClaims;
+try {
+  // Verificar la cookie de sesión
+  const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+  userId = decodedClaims.uid;
 
-    const userId = user.uid;
-
-    // Obtener las compras del usuario desde la subcolección 'purchases' dentro de 'users'
-    const purchasesSnapshot = await firestore
-      .collection('users')
-      .doc(userId)
-      .collection('purchases')
-      .get();
-
-    purchases = purchasesSnapshot.docs.map(doc => {
-      const data = doc.data();
-      // Si 'date' es un Timestamp de Firebase, conviértelo a Date de JS
-      if (data.date && data.date.toDate) {
-        data.date = data.date.toDate();
-      }
-      return data;
-    });
-
-  } catch (error) {
-    console.error('Error al obtener el perfil del usuario:', error);
+  // Obtener datos del usuario desde Firestore
+  const userDoc = await adminFirestore.collection('users').doc(userId).get();
+  if (userDoc.exists) {
+    userData = userDoc.data() as UserData;
+  } else {
+    console.error('No se encontró el documento del usuario');
+    userData = { email: decodedClaims.email };
   }
-} else {
-  // Redirigir al login si no está autenticado
+
+  // Obtener las compras del usuario
+  const purchasesSnapshot = await adminFirestore
+    .collection('users')
+    .doc(userId)
+    .collection('purchases')
+    .orderBy('purchasedAt', 'desc') // Asegúrate de que el campo está correctamente nombrado
+    .get();
+
+  purchases = purchasesSnapshot.docs.map(doc => {
+    const data = doc.data();
+    return {
+      ...data,
+      purchasedAt: data.purchasedAt.toDate(), // Convertir Timestamp a Date
+    };
+  });
+} catch (error) {
+  console.error('Error al obtener los datos del usuario o las compras:', error);
   return Astro.redirect('/login');
 }
 ---
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <title>Perfil de Usuario</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-gray-100 font-sans">
+    <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+      <h1 class="text-3xl font-bold mb-4">¡Bienvenido, {userData.firstName ?? userData.email}!</h1>
+      <p class="text-gray-700 mb-6">Esta es tu página de perfil. Aquí puedes ver tus compras y actualizar tu información.</p>
 
-<section class="p-6">
-  <h2 class="text-2xl font-bold">Bienvenido, {user.email}</h2>
-  <h3 class="text-xl font-semibold mt-4">Historial de Compras</h3>
-  {purchases.length > 0 ? (
-    <ul class="mt-2">
-      {purchases.map(purchase => (
-        <li class="border-b py-2">
-          <p><strong>Producto ID:</strong> {purchase.productId}</p>
-          <p><strong>Vendedor:</strong> {purchase.sellerName}</p>
-          <p><strong>Precio:</strong> ${purchase.price}</p>
-          <p><strong>Fecha:</strong> {purchase.date ? purchase.date.toLocaleString() : 'Sin fecha'}</p>
-        </li>
-      ))}
-    </ul>
-  ) : (
-    <p class="mt-2">No tienes compras realizadas.</p>
-  )}
-</section>
+      <h2 class="text-2xl font-semibold mb-4">Mis Compras</h2>
+      {purchases.length > 0 ? (
+        <ul class="space-y-4">
+          {purchases.map(purchase => (
+            <li class="border p-4 rounded-lg shadow-sm bg-gray-50">
+              <div class="flex items-center justify-between">
+                <div>
+                  <p class="text-lg font-medium">Producto ID: {purchase.productId}</p>
+                  <p class="text-sm text-gray-600">Vendedor: {purchase.sellerName}</p>
+                </div>
+                <div class="text-right">
+                  <p class="text-lg font-semibold text-green-600">${purchase.price.toFixed(2)}</p>
+                  <p class="text-sm text-gray-600">{purchase.purchasedAt.toLocaleString()}</p>
+                </div>
+              </div>
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p class="text-gray-700">No has realizado compras aún.</p>
+      )}
+
+      <!-- Opcional: Enlace para cerrar sesión -->
+      <div class="mt-6">
+        <a href="/logout" class="text-blue-600 hover:underline">Cerrar sesión</a>
+      </div>
+    </section>
+  </body>
+</html>

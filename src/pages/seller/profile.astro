@@ -1,0 +1,102 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { adminAuth, adminFirestore } from '../../firebase/server';
+
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+let user = null;
+let sellerData = null;
+
+if (sessionCookie) {
+  try {
+    const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+
+    if (decodedClaims.seller) {
+      user = decodedClaims;
+
+      // Obtener datos del vendedor
+      const sellerDoc = await adminFirestore.collection('sellers').doc(user.uid).get();
+      if (sellerDoc.exists) {
+        sellerData = sellerDoc.data();
+      }
+    } else {
+      return Astro.redirect('/no-autorizado');
+    }
+  } catch (error) {
+    console.error('Error al verificar la sesión:', error);
+    return Astro.redirect('/login');
+  }
+} else {
+  return Astro.redirect('/login');
+}
+---
+<BaseLayout>
+  <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-6">Perfil del Vendedor</h2>
+    <form id="sellerProfileForm" class="space-y-6">
+      <!-- Campo para el Nombre de la Tienda -->
+      <div>
+        <label for="storeName" class="block text-sm font-medium text-gray-700">Nombre de la Tienda</label>
+        <input
+          type="text"
+          id="storeName"
+          name="storeName"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+          required
+          value={sellerData?.name || ''}
+        />
+      </div>
+
+      <!-- Otros campos adicionales que desees -->
+
+      <!-- Botón de Guardar -->
+      <div>
+        <button
+          type="submit"
+          class="w-full bg-blue-600 text-white px-4 py-3 rounded-md font-semibold hover:bg-blue-700 transition duration-200"
+        >
+          Guardar Cambios
+        </button>
+      </div>
+    </form>
+  </section>
+
+  <script>
+    document.getElementById('sellerProfileForm').addEventListener('submit', async (event) => {
+      event.preventDefault();
+
+      const storeNameInput = document.getElementById('storeName');
+
+      if (storeNameInput instanceof HTMLInputElement) {
+        const storeName = storeNameInput.value;
+
+        try {
+          const response = await fetch('/api/seller/updateProfile', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              name: storeName,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert('Perfil actualizado correctamente');
+            // Opcional: Recargar la página para mostrar los cambios
+            window.location.reload();
+          } else {
+            alert('Error: ' + result.message);
+          }
+        } catch (error) {
+          console.error('Error al actualizar el perfil:', error);
+          alert('Error al actualizar el perfil');
+        }
+      } else {
+        alert('Error al obtener los datos del formulario.');
+      }
+    });
+  </script>
+</BaseLayout>
