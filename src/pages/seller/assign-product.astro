@@ -1,0 +1,144 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout>
+  <section class="container mx-auto px-6 py-12">
+    <h2 class="text-3xl font-bold mb-6">Asignar Precio y Stock a Producto Existente</h2>
+    <div id="error-container" class="text-red-600 mb-4"></div>
+    <div id="success-container" class="text-green-600 mb-4"></div>
+
+    <form id="assignProductForm" class="space-y-4">
+      <div>
+        <label for="existingProduct" class="block text-sm font-medium text-gray-700">Selecciona Producto Existente</label>
+        <select id="existingProduct" name="existingProduct" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required>
+          <option value="">-- Selecciona un producto --</option>
+          <!-- Opciones de productos se agregarán dinámicamente -->
+        </select>
+      </div>
+      <div>
+        <label for="price" class="block text-sm font-medium text-gray-700">Precio</label>
+        <input type="number" id="price" name="price" min="0" step="0.01" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+      </div>
+      <div>
+        <label for="stock" class="block text-sm font-medium text-gray-700">Stock</label>
+        <input type="number" id="stock" name="stock" min="0" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+      </div>
+      <button type="submit" class="mt-4 bg-green-600 text-white px-4 py-2 rounded">Asignar Precio y Stock</button>
+    </form>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('assignProductForm');
+      const errorContainer = document.getElementById('error-container');
+      const successContainer = document.getElementById('success-container');
+      const existingProductSelect = document.getElementById('existingProduct');
+
+      // Función para cargar todos los productos existentes
+      const loadProducts = async () => {
+        try {
+          const response = await fetch('/api/seller/get-products');
+          const data = await response.json();
+
+          // Depuración: Mostrar los productos obtenidos
+          console.log('Productos obtenidos:', data.products);
+
+          if (response.ok && data.products) {
+            data.products.forEach(product => {
+              const option = document.createElement('option');
+              option.value = product.id;
+              option.textContent = `${product.name} - ${product.artistName} (${product.albumName})`;
+              existingProductSelect.appendChild(option);
+            });
+          } else {
+            console.error('Error al cargar productos:', data.message);
+            if (errorContainer) errorContainer.textContent = 'Error al cargar productos.';
+          }
+        } catch (error) {
+          console.error('Error al cargar productos:', error);
+          if (errorContainer) errorContainer.textContent = 'Error al cargar productos.';
+        }
+      };
+
+      // Cargar productos al iniciar
+      loadProducts();
+
+      if (form) {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+
+          // Limpiar contenedores de mensajes
+          if (errorContainer) errorContainer.textContent = '';
+          if (successContainer) successContainer.textContent = '';
+
+          // Obtener los valores del formulario de forma segura
+          const existingProductElement = document.getElementById('existingProduct');
+          const priceElement = document.getElementById('price');
+          const stockElement = document.getElementById('stock');
+
+          // Verificar que los elementos existen y son del tipo correcto
+          if (
+            existingProductElement instanceof HTMLSelectElement &&
+            priceElement instanceof HTMLInputElement &&
+            stockElement instanceof HTMLInputElement
+          ) {
+            const productId = existingProductElement.value;
+            const price = parseFloat(priceElement.value);
+            const stock = parseInt(stockElement.value, 10);
+
+            // Depuración: Mostrar los valores obtenidos
+            console.log('Formulario de asignar producto enviado:', { productId, price, stock });
+
+            // Validación básica
+            if (!productId || isNaN(price) || isNaN(stock)) {
+              if (errorContainer) errorContainer.textContent = 'Por favor, completa todos los campos correctamente.';
+              return;
+            }
+
+            try {
+              // Enviar la solicitud al servidor
+              const response = await fetch('/api/seller/assign-product', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ productId, price, stock }),
+              });
+
+              // Depuración: Mostrar el estado de la respuesta
+              console.log('Estado de la respuesta:', response.status);
+
+              // Intentar parsear la respuesta como JSON
+              let result;
+              try {
+                result = await response.json();
+              } catch (jsonError) {
+                console.error('Error al parsear JSON:', jsonError);
+                const text = await response.text();
+                console.error('Respuesta de texto:', text);
+                throw new Error('Respuesta no es JSON');
+              }
+
+              // Depuración: Mostrar la respuesta del servidor
+              console.log('Respuesta del servidor:', result);
+
+              if (response.ok) {
+                if (successContainer) successContainer.textContent = result.message;
+
+                // Limpiar los valores de los campos del formulario manualmente
+                existingProductElement.value = '';
+                priceElement.value = '';
+                stockElement.value = '';
+              } else {
+                if (errorContainer) errorContainer.textContent = result.message || 'Error al asignar el producto.';
+              }
+            } catch (error) {
+              console.error('Error al asignar el producto:', error);
+              if (errorContainer) errorContainer.textContent = 'Error al asignar el producto. Por favor, intenta nuevamente.';
+            }
+          } else {
+            if (errorContainer) errorContainer.textContent = 'Error al obtener los valores del formulario.';
+          }
+        });
+      }
+    });
+  </script>
+</BaseLayout>

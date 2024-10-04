@@ -1,0 +1,127 @@
+---
+import BaseLayout from "../../layouts/BaseLayout.astro";
+---
+<BaseLayout>
+  <section class="container mx-auto px-6 py-12">
+    <h2 class="text-3xl font-bold mb-6">Agregar Nuevo Producto</h2>
+    <div id="error-container" class="text-red-600 mb-4"></div>
+    <div id="success-container" class="text-green-600 mb-4"></div>
+
+    <form id="addNewProductForm" class="space-y-4">
+      <div>
+        <label for="name" class="block text-sm font-medium text-gray-700">Nombre del Producto</label>
+        <input type="text" id="name" name="name" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+      </div>
+      <div>
+        <label for="artistName" class="block text-sm font-medium text-gray-700">Nombre del Artista</label>
+        <input type="text" id="artistName" name="artistName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+      </div>
+      <div>
+        <label for="albumName" class="block text-sm font-medium text-gray-700">Nombre del Álbum</label>
+        <input type="text" id="albumName" name="albumName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+      </div>
+      <div>
+        <label for="description" class="block text-sm font-medium text-gray-700">Descripción</label>
+        <textarea id="description" name="description" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows="4" required></textarea>
+      </div>
+      <div>
+        <label for="imageUrl" class="block text-sm font-medium text-gray-700">URL de Imagen</label>
+        <input type="url" id="imageUrl" name="imageUrl" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+      </div>
+      <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">Agregar Producto</button>
+    </form>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('addNewProductForm');
+      const errorContainer = document.getElementById('error-container');
+      const successContainer = document.getElementById('success-container');
+
+      if (form) {
+        form.addEventListener('submit', async (event) => {
+          event.preventDefault();
+
+          // Limpiar contenedores de mensajes
+          if (errorContainer) errorContainer.textContent = '';
+          if (successContainer) successContainer.textContent = '';
+
+          // Obtener los valores del formulario de forma segura
+          const nameElement = document.getElementById('name');
+          const artistNameElement = document.getElementById('artistName');
+          const albumNameElement = document.getElementById('albumName');
+          const descriptionElement = document.getElementById('description');
+          const imageUrlElement = document.getElementById('imageUrl');
+
+          // Verificar que los elementos existen y son del tipo correcto
+          if (
+            nameElement instanceof HTMLInputElement &&
+            artistNameElement instanceof HTMLInputElement &&
+            albumNameElement instanceof HTMLInputElement &&
+            descriptionElement instanceof HTMLTextAreaElement &&
+            imageUrlElement instanceof HTMLInputElement
+          ) {
+            const name = nameElement.value.trim();
+            const artistName = artistNameElement.value.trim();
+            const albumName = albumNameElement.value.trim();
+            const description = descriptionElement.value.trim();
+            const imageUrl = imageUrlElement.value.trim();
+
+            // Depuración: Mostrar los valores obtenidos
+            console.log('Formulario de agregar producto enviado:', { name, artistName, albumName, description, imageUrl });
+
+            // Validación básica
+            if (!name || !artistName || !albumName || !description || !imageUrl) {
+              errorContainer.textContent = 'Por favor, completa todos los campos correctamente.';
+              return;
+            }
+
+            try {
+              // Enviar la solicitud al servidor
+              const response = await fetch('/api/seller/add-new-product', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, artistName, albumName, description, imageUrl }),
+              });
+
+              // Depuración: Mostrar el estado de la respuesta
+              console.log('Estado de la respuesta:', response.status);
+
+              // Intentar parsear la respuesta como JSON
+              let result;
+              try {
+                result = await response.json();
+              } catch (jsonError) {
+                console.error('Error al parsear JSON:', jsonError);
+                const text = await response.text();
+                console.error('Respuesta de texto:', text);
+                throw new Error('Respuesta no es JSON');
+              }
+
+              // Depuración: Mostrar la respuesta del servidor
+              console.log('Respuesta del servidor:', result);
+
+              if (response.ok) {
+                if (successContainer) successContainer.textContent = result.message;
+
+                // Limpiar los valores de los campos del formulario manualmente
+                nameElement.value = '';
+                artistNameElement.value = '';
+                albumNameElement.value = '';
+                descriptionElement.value = '';
+                imageUrlElement.value = '';
+              } else {
+                if (errorContainer) errorContainer.textContent = result.message || 'Error al agregar el producto.';
+              }
+            } catch (error) {
+              console.error('Error al agregar el producto:', error);
+              if (errorContainer) errorContainer.textContent = 'Error al agregar el producto. Por favor, intenta nuevamente.';
+            }
+          } else {
+            if (errorContainer) errorContainer.textContent = 'Error al obtener los valores del formulario.';
+          }
+        });
+      }
+    });
+  </script>
+</BaseLayout>

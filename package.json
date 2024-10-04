@@ -14,8 +14,10 @@
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.0.0-alpha.23",
     "@types/cookie-parser": "^1.4.7",
+    "@types/node": "^22.7.4",
     "astro": "^4.15.4",
-    "tailwindcss": "^4.0.0-alpha.23"
+    "tailwindcss": "^4.0.0-alpha.23",
+    "typescript": "^5.6.2"
   },
   "dependencies": {
     "@astrojs/check": "^0.9.3",
@@ -31,7 +33,6 @@
     "firebase": "^10.14.0",
     "firebase-admin": "^12.6.0",
     "mongodb": "^6.8.1",
-    "resend": "^3.2.0",
-    "typescript": "^5.6.2"
+    "resend": "^3.2.0"
   }
 }

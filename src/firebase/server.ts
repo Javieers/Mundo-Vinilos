@@ -11,22 +11,26 @@ if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !pr
   throw new Error('Faltan variables de entorno necesarias para Firebase');
 }
 
-// Inicializar Firebase Admin SDK si no está inicializado
 if (!admin.apps.length) {
   admin.initializeApp({
     credential: admin.credential.cert({
       projectId: process.env.FIREBASE_PROJECT_ID,
-      privateKey: process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
       clientEmail: process.env.FIREBASE_CLIENT_EMAIL,
+      // Asegúrate de reemplazar las nuevas líneas en la clave privada
+      privateKey: process.env.FIREBASE_PRIVATE_KEY?.replace(/\\n/g, '\n'),
     }),
-    storageBucket: 'YOUR_STORAGE_BUCKET', // Reemplaza con tu bucket de almacenamiento si es necesario
+    storageBucket: process.env.FIREBASE_STORAGE_BUCKET, // Añade esta línea
+    databaseURL: process.env.FIREBASE_DATABASE_URL, // Opcional, si usas Realtime Database
   });
 }
-
+console.log(`Firebase Admin initialized: ${admin.apps.length} app(s) active`);
+console.log('FieldValue:', admin.firestore.FieldValue); // Verificar si FieldValue está disponible
 // Exportar instancias del Admin SDK
 export const adminAuth = admin.auth();
 export const adminFirestore = admin.firestore();
-export const adminStorage = admin.storage().bucket(); // Si usas Cloud Storage
+
+export const adminStorage = admin.storage(); // Exporta el almacenamiento
+export { admin };
 
 // Configuración de Express
 const expressApp = express();
@@ -119,17 +123,100 @@ expressApp.listen(PORT, () => {
 // Obtener todos los productos disponibles en la colección 'products'
 export async function getProducts() {
   try {
-    const querySnapshot = await adminFirestore.collection('products').get();
-    const products = [];
-    querySnapshot.forEach((doc) => {
-      products.push({ id: doc.id, ...doc.data() });
+    // Obtener los 9 productos más recientes de la colección 'products'
+    const productsSnapshot = await adminFirestore.collection('products')
+      .orderBy('createdAt', 'desc')
+      .limit(9)
+      .get();
+
+    const products = productsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name ?? 'Sin nombre',
+      artistName: doc.data().artistName ?? 'Artista desconocido',
+      description: doc.data().description ?? 'Sin descripción',
+      imageUrl: doc.data().imageUrl ?? '/default-image.png', // Imagen por defecto si no existe
+      createdAt: doc.data().createdAt,
+    }));
+
+    // Obtener los precios de todos los productos de la subcolección 'sellers/products'
+    const sellersProductsSnapshot = await adminFirestore.collectionGroup('products').get();
+
+    const priceMap: { [key: string]: number } = {};
+
+    sellersProductsSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const productId = data.productId;
+      const price = data.price;
+
+      if (priceMap[productId] != null) {
+        priceMap[productId] = Math.min(priceMap[productId], price);
+      } else {
+        priceMap[productId] = price;
+      }
     });
-    return products;
+
+    // Añadir el precio más bajo a cada producto
+    const productsWithPrices = products.map(product => ({
+      ...product,
+      price: priceMap[product.id] !== undefined ? priceMap[product.id] : 'N/A',
+    }));
+
+    return productsWithPrices;
+
   } catch (error) {
     console.error('Error obteniendo productos:', error);
     throw new Error('Error al obtener productos');
   }
 }
+
+// Obtener todos los productos sin límite
+export async function getAllProducts() {
+  try {
+    // Obtener todos los productos de la colección 'products'
+    const productsSnapshot = await adminFirestore.collection('products')
+      .orderBy('createdAt', 'desc')
+      .get();
+
+    const products = productsSnapshot.docs.map(doc => ({
+      id: doc.id,
+      name: doc.data().name ?? 'Sin nombre',
+      artistName: doc.data().artistName ?? 'Artista desconocido',
+      description: doc.data().description ?? 'Sin descripción',
+      imageUrl: doc.data().imageUrl ?? '/default-image.png',
+      createdAt: doc.data().createdAt,
+    }));
+
+    // Obtener los precios de todos los productos de la subcolección 'sellers/products'
+    const sellersProductsSnapshot = await adminFirestore.collectionGroup('products').get();
+
+    const priceMap: { [key: string]: number } = {};
+
+    sellersProductsSnapshot.docs.forEach(doc => {
+      const data = doc.data();
+      const productId = data.productId;
+      const price = data.price;
+
+      if (priceMap[productId] != null) {
+        priceMap[productId] = Math.min(priceMap[productId], price);
+      } else {
+        priceMap[productId] = price;
+      }
+    });
+
+    // Añadir el precio más bajo a cada producto
+    const productsWithPrices = products.map(product => ({
+      ...product,
+      price: priceMap[product.id] !== undefined ? priceMap[product.id] : 'N/A',
+    }));
+
+    return productsWithPrices;
+
+  } catch (error) {
+    console.error('Error obteniendo todos los productos:', error);
+    throw new Error('Error al obtener todos los productos');
+  }
+}
+
 
 // Guardar información del producto para un vendedor en la subcolección 'products'
 export async function saveSellerProductInfo(
@@ -230,9 +317,9 @@ export async function getSellerInfo(sellerId: string) {
           productId,
           price: sellerProductData.price,
           stock: sellerProductData.stock,
-          name: productDoc.data()?.name,
-          description: productDoc.data()?.description,
-          imageUrl: productDoc.data()?.imageUrl,
+          name: productDoc.data()?.name ?? 'Nombre no disponible',
+          description: productDoc.data()?.description ?? 'Descripción no disponible',
+          imageUrl: productDoc.data()?.imageUrl ?? '/default-image.png',
         };
       })
     );

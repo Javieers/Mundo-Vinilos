@@ -1,9 +1,9 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getProducts, getSellerProductInfo } from '../../firebase/server';
+import { getAllProducts, getSellerProductInfo } from '../../firebase/server';
 
 const { id } = Astro.params;
-const products = await getProducts();
+const products = await getAllProducts();
 const product = products.find(p => p.id === id);
 
 if (!product) {

@@ -1,0 +1,209 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { adminAuth, adminFirestore } from '../../firebase/server';
+import { FieldValue } from 'firebase-admin/firestore';
+
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+if (!sessionCookie) {
+  return Astro.redirect('/login');
+}
+
+let user = null;
+let productId = Astro.url.searchParams.get('id');
+
+if (!productId) {
+  return Astro.redirect('/seller/list-products');
+}
+
+let product = null;
+
+try {
+  const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+  if (decodedClaims.seller) {
+    user = decodedClaims;
+  } else {
+    return Astro.redirect('/no-autorizado');
+  }
+
+  // Obtener el producto específico del vendedor
+  const productDoc = await adminFirestore
+    .collection('sellers')
+    .doc(user.uid)
+    .collection('products')
+    .doc(productId)
+    .get();
+
+  if (!productDoc.exists) {
+    return Astro.redirect('/seller/list-products');
+  }
+
+  product = { id: productDoc.id, ...productDoc.data() };
+} catch (error) {
+  console.error('Error al verificar la sesión o obtener el producto:', error);
+  return Astro.redirect('/login');
+}
+---
+<BaseLayout>
+  <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+    <h2 class="text-2xl font-bold mb-6">Editar Producto</h2>
+    <form id="editProductForm" class="space-y-6">
+      <!-- Campos del Formulario -->
+      <div>
+        <label for="name" class="block text-sm font-medium text-gray-700">Nombre del Producto</label>
+        <input
+          type="text"
+          id="name"
+          name="name"
+          value={product.name}
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa el nombre del producto"
+        />
+      </div>
+      <div>
+        <label for="artistName" class="block text-sm font-medium text-gray-700">Nombre del Artista</label>
+        <input
+          type="text"
+          id="artistName"
+          name="artistName"
+          value={product.artistName}
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa el nombre del artista"
+        />
+      </div>
+      <div>
+        <label for="albumName" class="block text-sm font-medium text-gray-700">Nombre del Álbum</label>
+        <input
+          type="text"
+          id="albumName"
+          name="albumName"
+          value={product.albumName}
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa el nombre del álbum"
+        />
+      </div>
+      <div>
+        <label for="description" class="block text-sm font-medium text-gray-700">Descripción</label>
+        <textarea
+          id="description"
+          name="description"
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa la descripción del producto"
+        >{product.description}</textarea>
+      </div>
+      <div>
+        <label for="imageUrl" class="block text-sm font-medium text-gray-700">URL de la Imagen</label>
+        <input
+          type="url"
+          id="imageUrl"
+          name="imageUrl"
+          value={product.imageUrl}
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa la URL de la imagen del producto"
+        />
+      </div>
+      <div>
+        <label for="price" class="block text-sm font-medium text-gray-700">Precio</label>
+        <input
+          type="number"
+          id="price"
+          name="price"
+          min="0"
+          step="0.01"
+          value={product.price}
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa el precio del producto"
+        />
+      </div>
+      <div>
+        <label for="stock" class="block text-sm font-medium text-gray-700">Stock</label>
+        <input
+          type="number"
+          id="stock"
+          name="stock"
+          min="0"
+          value={product.stock}
+          required
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2"
+          placeholder="Ingresa el stock disponible"
+        />
+      </div>
+      <div>
+        <button
+          type="submit"
+          class="w-full bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition duration-200"
+        >
+          Guardar Cambios
+        </button>
+      </div>
+      <div id="error-container" class="text-red-500 text-sm"></div>
+      <div id="success-container" class="text-green-500 text-sm"></div>
+    </form>
+  </section>
+
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('editProductForm') as HTMLFormElement;
+      const errorContainer = document.getElementById('error-container') as HTMLElement;
+      const successContainer = document.getElementById('success-container') as HTMLElement;
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        const name = (document.getElementById('name') as HTMLInputElement).value.trim();
+        const artistName = (document.getElementById('artistName') as HTMLInputElement).value.trim();
+        const albumName = (document.getElementById('albumName') as HTMLInputElement).value.trim();
+        const description = (document.getElementById('description') as HTMLTextAreaElement).value.trim();
+        const imageUrl = (document.getElementById('imageUrl') as HTMLInputElement).value.trim();
+        const price = parseFloat((document.getElementById('price') as HTMLInputElement).value);
+        const stock = parseInt((document.getElementById('stock') as HTMLInputElement).value, 10);
+
+        // Limpiar mensajes previos
+        errorContainer.innerHTML = '';
+        successContainer.innerHTML = '';
+
+        // Validaciones básicas
+        if (!name || !artistName || !albumName || !description || !imageUrl || isNaN(price) || isNaN(stock)) {
+          errorContainer.innerHTML = 'Por favor, completa todos los campos correctamente.';
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/seller/edit-product`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              productId: '{product.id}',
+              name,
+              artistName,
+              albumName,
+              description,
+              imageUrl,
+              price,
+              stock,
+            }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            successContainer.innerHTML = result.message;
+          } else {
+            errorContainer.innerHTML = result.message || 'Error al editar el producto.';
+          }
+        } catch (error) {
+          console.error('Error al editar el producto:', error);
+          errorContainer.innerHTML = 'Error al editar el producto. Por favor, intenta nuevamente.';
+        }
+      });
+    });
+  </script>
+</BaseLayout>

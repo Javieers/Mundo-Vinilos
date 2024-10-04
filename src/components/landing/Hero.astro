@@ -10,7 +10,7 @@ const products = await getProducts();
       <div class="text-center max-w-4xl mx-auto">
         <div class="sm:flex sm:justify-center">
           <div class="relative rounded-full py-1 px-3 text-sm leading-6 text-gray-600 ring-1 ring-gray-900/10 hover:ring-gray-900/20">
-            <a href="/login" class="font-semibold text-accent-600">
+            <a href="/allproducts" class="font-semibold text-accent-600">
               <span class="absolute inset-0" aria-hidden="true"></span>
               <span class="block lg:inline">Lo más buscado <span aria-hidden="true">→</span></span>
             </a>
@@ -31,18 +31,24 @@ const products = await getProducts();
         </div>
       </dl>
     </div>
-  <div class="mt-12">
-    <h2 class="text-2xl font-semibold text-center">Nuestros Productos</h2>
-    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-      {products.map(product => (
-        <a href={`/product/${product.id}`} class="bg-white p-6 rounded-lg shadow-lg">
-          <img src={product.imageUrl} alt={product.name} class="w-full h-48 object-cover rounded-md" />
-          <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
-          <p class="mt-2 text-gray-600">{product.description}</p>
-          <p class="mt-2 text-gray-800 font-bold">${product.price}</p>
-          <p class="mt-2 text-gray-600">Stock: {product.stock}</p>
-        </a>
-      ))}
+    <div class="mt-12">
+      <h2 class="text-2xl font-semibold text-center">Productos en tendencia</h2>
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+        {products.map(product => (
+          <a href={`/product/${product.id}`} class="bg-white p-6 rounded-lg shadow-lg">
+            <img
+              src={product.imageUrl}
+              alt={`${product.name} by ${product.artistName}`}
+              class="w-full h-48 object-cover rounded-md"
+            />
+            <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
+            <p class="mt-2 text-gray-600">Artista: {product.artistName}</p>
+            <p class="mt-2 text-gray-800 font-bold">
+  Precio más bajo: ${typeof product.price === 'number' ? Number(product.price).toLocaleString('es-ES') : 'N/A'}
+</p>
+          </a>
+        ))}
+      </div>
     </div>
   </div>
 </section>

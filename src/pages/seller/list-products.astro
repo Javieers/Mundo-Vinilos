@@ -1,0 +1,105 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { adminAuth, adminFirestore } from '../../firebase/server';
+
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+if (!sessionCookie) {
+  return Astro.redirect('/login');
+}
+
+let user = null;
+let products = [];
+
+try {
+  const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+  if (decodedClaims.seller) {
+    user = decodedClaims;
+  } else {
+    return Astro.redirect('/no-autorizado');
+  }
+
+  // Obtener productos del vendedor
+  const productsSnapshot = await adminFirestore
+    .collection('sellers')
+    .doc(user.uid)
+    .collection('products')
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  products = productsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+} catch (error) {
+  console.error('Error al obtener productos del vendedor:', error);
+  return Astro.redirect('/login');
+}
+---
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8">
+    <title>Mis Productos - Mundo Vinilos</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  </head>
+  <body class="bg-gray-100 font-sans">
+    <BaseLayout>
+      <section class="max-w-7xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+        <h2 class="text-2xl font-bold mb-6">Mis Productos</h2>
+        <a href="/seller/add-product" class="mb-4 inline-block bg-blue-600 text-white px-4 py-2 rounded-md hover:bg-blue-700">Agregar Nuevo Producto</a>
+        {products.length > 0 ? (
+          <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {products.map(product => (
+              <div class="border rounded-lg shadow-sm p-4 bg-gray-50">
+                <img src={product.imageUrl} alt={product.name} class="w-full h-40 object-cover rounded-md mb-4" />
+                <h3 class="text-xl font-semibold">{product.name}</h3>
+                <p class="text-gray-700">Artista: {product.artistName}</p>
+                <p class="text-gray-700">Álbum: {product.albumName}</p>
+                <p class="text-gray-700">Descripción: {product.description}</p>
+                <p class="text-green-600 font-bold mt-2">Precio: ${product.price.toFixed(2)}</p>
+                <p class="text-gray-700">Stock: {product.stock}</p>
+                <div class="mt-4 flex justify-between">
+                  <a href={`/seller/edit-product?id=${product.id}`} class="text-blue-600 hover:underline">Editar</a>
+                  <button data-product-id={product.id} class="text-red-600 hover:underline delete-button">Eliminar</button>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p class="text-gray-700">No has agregado ningún producto aún.</p>
+        )}
+      </section>
+
+      <script>
+        // Manejar la eliminación de productos
+        document.querySelectorAll('.delete-button').forEach(button => {
+          button.addEventListener('click', async () => {
+            const productId = button.getAttribute('data-product-id');
+            if (confirm('¿Estás seguro de que deseas eliminar este producto?')) {
+              try {
+                const response = await fetch(`/api/seller/deleteProduct`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                  },
+                  body: JSON.stringify({ productId }),
+                });
+
+                const result = await response.json();
+
+                if (response.ok) {
+                  alert(result.message);
+                  // Recargar la página para reflejar los cambios
+                  window.location.reload();
+                } else {
+                  alert(result.message || 'Error al eliminar el producto.');
+                }
+              } catch (error) {
+                console.error('Error al eliminar el producto:', error);
+                alert('Error al eliminar el producto. Por favor, intenta nuevamente.');
+              }
+            }
+          });
+        });
+      </script>
+    </BaseLayout>
+  </body>
+</html>
