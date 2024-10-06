@@ -1,6 +1,10 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+import { getAllProducts } from '../../firebase/server';
+
+const products = await getAllProducts(); // Obtener todos los productos desde el servidor
 ---
+
 <BaseLayout>
   <section class="container mx-auto px-6 py-12">
     <h2 class="text-3xl font-bold mb-6">Asignar Precio y Stock a Producto Existente</h2>
@@ -12,7 +16,11 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         <label for="existingProduct" class="block text-sm font-medium text-gray-700">Selecciona Producto Existente</label>
         <select id="existingProduct" name="existingProduct" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required>
           <option value="">-- Selecciona un producto --</option>
-          <!-- Opciones de productos se agregarán dinámicamente -->
+          {products.map(product => (
+            <option value={product.id}>
+              {product.name} - {product.artistName}
+            </option>
+          ))}
         </select>
       </div>
       <div>
@@ -32,36 +40,6 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       const form = document.getElementById('assignProductForm');
       const errorContainer = document.getElementById('error-container');
       const successContainer = document.getElementById('success-container');
-      const existingProductSelect = document.getElementById('existingProduct');
-
-      // Función para cargar todos los productos existentes
-      const loadProducts = async () => {
-        try {
-          const response = await fetch('/api/seller/get-products');
-          const data = await response.json();
-
-          // Depuración: Mostrar los productos obtenidos
-          console.log('Productos obtenidos:', data.products);
-
-          if (response.ok && data.products) {
-            data.products.forEach(product => {
-              const option = document.createElement('option');
-              option.value = product.id;
-              option.textContent = `${product.name} - ${product.artistName} (${product.albumName})`;
-              existingProductSelect.appendChild(option);
-            });
-          } else {
-            console.error('Error al cargar productos:', data.message);
-            if (errorContainer) errorContainer.textContent = 'Error al cargar productos.';
-          }
-        } catch (error) {
-          console.error('Error al cargar productos:', error);
-          if (errorContainer) errorContainer.textContent = 'Error al cargar productos.';
-        }
-      };
-
-      // Cargar productos al iniciar
-      loadProducts();
 
       if (form) {
         form.addEventListener('submit', async (event) => {
@@ -86,9 +64,6 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
             const price = parseFloat(priceElement.value);
             const stock = parseInt(stockElement.value, 10);
 
-            // Depuración: Mostrar los valores obtenidos
-            console.log('Formulario de asignar producto enviado:', { productId, price, stock });
-
             // Validación básica
             if (!productId || isNaN(price) || isNaN(stock)) {
               if (errorContainer) errorContainer.textContent = 'Por favor, completa todos los campos correctamente.';
@@ -103,27 +78,16 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
                 body: JSON.stringify({ productId, price, stock }),
               });
 
-              // Depuración: Mostrar el estado de la respuesta
-              console.log('Estado de la respuesta:', response.status);
-
-              // Intentar parsear la respuesta como JSON
               let result;
               try {
                 result = await response.json();
               } catch (jsonError) {
                 console.error('Error al parsear JSON:', jsonError);
-                const text = await response.text();
-                console.error('Respuesta de texto:', text);
                 throw new Error('Respuesta no es JSON');
               }
 
-              // Depuración: Mostrar la respuesta del servidor
-              console.log('Respuesta del servidor:', result);
-
               if (response.ok) {
                 if (successContainer) successContainer.textContent = result.message;
-
-                // Limpiar los valores de los campos del formulario manualmente
                 existingProductElement.value = '';
                 priceElement.value = '';
                 stockElement.value = '';

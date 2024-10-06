@@ -36,7 +36,29 @@ try {
 
     // Obtener productos del vendedor
     const sellerProductsSnapshot = await adminFirestore.collection('sellers').doc(sellerId).collection('products').get();
-    products = sellerProductsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const sellerProducts = sellerProductsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+    // Obtener la información completa de cada producto desde la colección principal "products"
+    const productPromises = sellerProducts.map(async (sellerProduct) => {
+      const productDoc = await adminFirestore.collection('products').doc(sellerProduct.id).get();
+      if (productDoc.exists) {
+        const productData = productDoc.data();
+        return {
+          ...sellerProduct,
+          name: productData?.name ?? 'Sin nombre',
+          artistName: productData?.artistName ?? 'Artista desconocido',
+          description: productData?.description ?? 'Sin descripción',
+          imageUrl: productData?.imageUrl ?? '/default-image.png',
+        };
+      } else {
+        return {
+          ...sellerProduct,
+          name: 'Producto no disponible', // Si no se encuentra el producto en la colección principal
+        };
+      }
+    });
+
+    products = await Promise.all(productPromises);
 
     // Obtener órdenes del vendedor
     const ordersSnapshot = await adminFirestore.collection('orders').where('sellerId', '==', sellerId).get();
@@ -49,6 +71,7 @@ try {
   return Astro.redirect('/login');
 }
 ---
+
 <BaseLayout>
   <!-- Interfaz del panel de control del vendedor -->
   <section class="max-w-7xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
