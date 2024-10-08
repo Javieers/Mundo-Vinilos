@@ -131,7 +131,9 @@ try {
           <tr>
             <td class="px-6 py-4">{order.productName}</td>
             <td class="px-6 py-4">{order.quantity}</td>
-            <td class="px-6 py-4">{order.date.toDate().toLocaleString()}</td>
+            <td class="px-6 py-4">
+            {order.date ? new Date(order.date.seconds * 1000).toLocaleString() : 'Fecha no disponible'}
+            </td>
             <td class="px-6 py-4 text-right">
               <!-- Opcionalmente, agregar acciones para gestionar la orden -->
             </td>
