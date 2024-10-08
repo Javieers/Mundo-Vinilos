@@ -13,8 +13,9 @@ if (!sessionCookie) {
 }
 
 let userId: string;
-let userData: UserData;
+let userData: UserData = { email: '' };
 let purchases = [];
+let errorOccurred = false;
 
 try {
   // Verificar la cookie de sesión
@@ -32,22 +33,42 @@ try {
 
   // Obtener las compras del usuario
   const purchasesSnapshot = await adminFirestore
-    .collection('users')
-    .doc(userId)
-    .collection('purchases')
-    .orderBy('purchasedAt', 'desc') // Asegúrate de que el campo está correctamente nombrado
+    .collection('orders')
+    .where('userId', '==', userId)
+    .orderBy('createdAt', 'desc')
     .get();
 
-  purchases = purchasesSnapshot.docs.map(doc => {
+  const purchasePromises = purchasesSnapshot.docs.map(async (doc) => {
     const data = doc.data();
+    let productName = data.productName;
+    let storeName = data.storeName;
+
+    // Si no tenemos el nombre del producto, lo obtenemos de la colección 'products'
+    if (!productName) {
+      const productDoc = await adminFirestore.collection('products').doc(data.productId).get();
+      productName = productDoc.exists ? productDoc.data()?.name : 'Producto no disponible';
+    }
+
+    // Si no tenemos el nombre de la tienda, lo obtenemos de la colección 'sellers'
+    if (!storeName) {
+      const sellerDoc = await adminFirestore.collection('sellers').doc(data.sellerId).get();
+      storeName = sellerDoc.exists ? sellerDoc.data()?.storeName : 'Tienda no disponible';
+    }
+
     return {
+      id: doc.id,
       ...data,
-      purchasedAt: data.purchasedAt.toDate(), // Convertir Timestamp a Date
+      productName,
+      storeName,
+      createdAt: data.createdAt ? data.createdAt.toDate() : null, // Manejar undefined
     };
   });
+
+  purchases = await Promise.all(purchasePromises);
+
 } catch (error) {
   console.error('Error al obtener los datos del usuario o las compras:', error);
-  return Astro.redirect('/login');
+  errorOccurred = true;
 }
 ---
 <html lang="es">
@@ -58,35 +79,45 @@ try {
   </head>
   <body class="bg-gray-100 font-sans">
     <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
-      <h1 class="text-3xl font-bold mb-4">¡Bienvenido, {userData.firstName ?? userData.email}!</h1>
-      <p class="text-gray-700 mb-6">Esta es tu página de perfil. Aquí puedes ver tus compras y actualizar tu información.</p>
-
-      <h2 class="text-2xl font-semibold mb-4">Mis Compras</h2>
-      {purchases.length > 0 ? (
-        <ul class="space-y-4">
-          {purchases.map(purchase => (
-            <li class="border p-4 rounded-lg shadow-sm bg-gray-50">
-              <div class="flex items-center justify-between">
-                <div>
-                  <p class="text-lg font-medium">Producto ID: {purchase.productId}</p>
-                  <p class="text-sm text-gray-600">Vendedor: {purchase.sellerName}</p>
-                </div>
-                <div class="text-right">
-                  <p class="text-lg font-semibold text-green-600">${purchase.price.toFixed(2)}</p>
-                  <p class="text-sm text-gray-600">{purchase.purchasedAt.toLocaleString()}</p>
-                </div>
-              </div>
-            </li>
-          ))}
-        </ul>
+      {errorOccurred ? (
+        <>
+          <h1 class="text-3xl font-bold mb-4">Ocurrió un error</h1>
+          <p class="text-gray-700 mb-6">No pudimos cargar tu perfil. Por favor, inténtalo de nuevo más tarde.</p>
+          <a href="/logout" class="text-blue-600 hover:underline">Cerrar sesión</a>
+        </>
       ) : (
-        <p class="text-gray-700">No has realizado compras aún.</p>
-      )}
+        <>
+          <h1 class="text-3xl font-bold mb-4">¡Bienvenido, {userData.firstName ?? userData.email}!</h1>
+          <p class="text-gray-700 mb-6">Esta es tu página de perfil. Aquí puedes ver tus compras y actualizar tu información.</p>
 
-      <!-- Opcional: Enlace para cerrar sesión -->
-      <div class="mt-6">
-        <a href="/logout" class="text-blue-600 hover:underline">Cerrar sesión</a>
-      </div>
+          <h2 class="text-2xl font-semibold mb-4">Mis Compras</h2>
+          {purchases.length > 0 ? (
+            <ul class="space-y-4">
+              {purchases.map(purchase => (
+                <li class="border p-4 rounded-lg shadow-sm bg-gray-50 hover:bg-gray-100 transition duration-200">
+                  <a href={`/purchase-details/${purchase.id}`} class="flex items-center justify-between">
+                    <div>
+                      <p class="text-lg font-medium">Producto: {purchase.productName || 'No disponible'}</p>
+                      <p class="text-sm text-gray-600">Tienda: {purchase.storeName || 'No disponible'}</p>
+                    </div>
+                    <div class="text-right">
+                      <p class="text-lg font-semibold text-green-600">${purchase.total?.toFixed(2) || '0.00'}</p>
+                      <p class="text-sm text-gray-600">{purchase.createdAt ? purchase.createdAt.toLocaleString() : 'Fecha no disponible'}</p>
+                    </div>
+                  </a>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p class="text-gray-700">No has realizado compras aún.</p>
+          )}
+
+          <!-- Enlace para cerrar sesión -->
+          <div class="mt-6">
+            <a href="/logout" class="text-blue-600 hover:underline">Cerrar sesión</a>
+          </div>
+        </>
+      )}
     </section>
   </body>
 </html>

@@ -26,9 +26,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const sellerId = decodedClaims.uid;
-    const { productId, productData } = await request.json();
+    const { productId, price, stock } = await request.json();
 
-    if (!productId || !productData) {
+    if (!productId || price == null || stock == null) {
       return new Response(JSON.stringify({ message: 'Datos de producto inválidos' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
@@ -52,7 +52,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     // Actualizar el producto
     await productRef.update({
-      ...productData,
+      price,
+      stock,
       updatedAt: FieldValue.serverTimestamp(),
     });
 

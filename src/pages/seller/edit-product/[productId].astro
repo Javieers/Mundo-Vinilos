@@ -93,12 +93,12 @@ try {
     </form>
   </section>
 
-  <script>
+  <script is:inline define:vars={{ product }}>
     document.getElementById('editProductForm').addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const priceInput = document.getElementById('price') as HTMLInputElement;
-      const stockInput = document.getElementById('stock') as HTMLInputElement;
+      const priceInput = document.getElementById('price');
+      const stockInput = document.getElementById('stock');
 
       const price = parseFloat(priceInput.value);
       const stock = parseInt(stockInput.value, 10);
@@ -115,7 +115,7 @@ try {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            productId: '{product.id}',
+            productId: product.id,
             price,
             stock,
           }),

@@ -1,0 +1,117 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { adminAuth, adminFirestore } from '../../firebase/server';
+import { getSellerInfo } from '../../firebase/server';
+import { format } from 'date-fns';
+
+const { orderId } = Astro.params;
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+if (!sessionCookie) {
+  return Astro.redirect('/login');
+}
+
+let user = null;
+let order = null;
+let product = null;
+let sellerInfo = null;
+
+try {
+  const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+  user = decodedClaims;
+  const userId = user.uid;
+
+  // Obtener la orden desde Firestore
+  const orderDoc = await adminFirestore.collection('orders').doc(orderId).get();
+
+  if (orderDoc.exists) {
+    order = { id: orderDoc.id, ...orderDoc.data() };
+
+    // Verificar que el usuario sea el comprador de la orden
+    if (order.userId !== userId) {
+      return Astro.redirect('/no-autorizado');
+    }
+
+    // Obtener información del producto
+    const productDoc = await adminFirestore.collection('products').doc(order.productId).get();
+    if (productDoc.exists) {
+      product = { id: productDoc.id, ...productDoc.data() };
+    }
+
+    // Obtener información del vendedor
+    sellerInfo = await getSellerInfo(order.sellerId || '');
+  } else {
+    console.error('Orden no encontrada en Firestore');
+  }
+} catch (error) {
+  console.error('Error al obtener la orden o la información del vendedor:', error);
+  return Astro.redirect('/login');
+}
+---
+<BaseLayout>
+  <section class="p-6 flex justify-center items-center bg-gray-100 min-h-screen">
+    <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-3xl">
+      <h2 class="text-3xl font-bold text-center mb-6">Detalles de la Compra</h2>
+
+      <!-- Mensaje Informativo -->
+      <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert">
+        <p class="font-bold">¡Gracias por tu compra!</p>
+        <p>Por favor, sigue las instrucciones a continuación para retirar tu producto.</p>
+      </div>
+
+      {order && product ? (
+        <div class="flex flex-col lg:flex-row">
+          <!-- Imagen del Producto -->
+          <div class="lg:w-1/3 flex justify-center">
+            <img src={product.imageUrl} alt={product.name} class="w-full h-auto object-contain rounded-md shadow-md" />
+          </div>
+
+          <!-- Información del Producto y Vendedor -->
+          <div class="lg:w-2/3 lg:pl-6 mt-4 lg:mt-0">
+            <p class="text-xl font-semibold">{product.name}</p>
+            <p class="text-gray-600 mt-2"><strong>Tienda:</strong> {sellerInfo?.seller?.storeName || order.storeName || 'No disponible'}</p>
+            <p class="text-gray-600"><strong>Precio:</strong> ${order.price.toFixed(2)}</p>
+            <p class="text-gray-600"><strong>Cantidad:</strong> {order.quantity}</p>
+            <p class="text-gray-600"><strong>Total:</strong> ${order.total.toFixed(2)}</p>
+            <p class="text-gray-600"><strong>Número de Orden:</strong> {order.id}</p>
+            <p class="text-gray-600"><strong>Estado:</strong> {order.status}</p>
+
+            <!-- Información Detallada del Vendedor -->
+            {sellerInfo && sellerInfo.seller ? (
+              <div class="mt-6 border-t pt-4">
+                <h3 class="text-xl font-semibold mb-2">Información del Vendedor</h3>
+                <div class="flex items-center mb-4">
+                  <img src={sellerInfo.seller.sellerImage} alt={sellerInfo.seller.storeName} class="w-16 h-16 rounded-full object-cover mr-4" />
+                  <div>
+                    <p class="text-lg font-medium">{sellerInfo.seller.storeName}</p>
+                    <p class="text-gray-600">{sellerInfo.seller.storeName}</p>
+                  </div>
+                </div>
+                <p class="text-gray-700"><strong>Dirección:</strong> {sellerInfo.seller.direccion || 'No disponible'}</p>
+                <p class="text-gray-700"><strong>Email:</strong> {sellerInfo.seller.email || 'No disponible'}</p>
+                <p class="text-gray-700"><strong>Número Telefónico:</strong> {sellerInfo.seller.numeroTelefonico || 'No disponible'}</p>
+                <p class="text-gray-700"><strong>Redes Sociales:</strong> {sellerInfo.seller.redesSociales || 'No disponible'}</p>
+                <div class="mt-2">
+                  <h4 class="font-semibold">Horario de Atención:</h4>
+                  <p class="text-gray-700"><strong>Desde:</strong> {sellerInfo.seller.horarioAtencion?.desde || 'No disponible'}</p>
+                  <p class="text-gray-700"><strong>Hasta:</strong> {sellerInfo.seller.horarioAtencion?.hasta || 'No disponible'}</p>
+                </div>
+                <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {sellerInfo.seller.updatedAt ? format(sellerInfo.seller.updatedAt, 'dd de MMMM de yyyy, h:mm:ss aaaa') : 'No disponible'}</p>
+              </div>
+            ) : (
+              <p class="text-red-600 mt-4">Información del vendedor no disponible.</p>
+            )}
+
+            <!-- Instrucciones de Retiro -->
+            <div class="mt-6 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
+              <p class="font-bold">Instrucciones para Retirar tu Producto</p>
+              <p>Debes acercarte con el número de orden al local en los horarios de atención indicados. ¡Gracias por tu compra!</p>
+            </div>
+          </div>
+        </div>
+      ) : (
+        <p class="text-red-600 font-semibold text-center">Orden o producto no encontrado.</p>
+      )}
+    </div>
+  </section>
+</BaseLayout>

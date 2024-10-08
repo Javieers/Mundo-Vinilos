@@ -1,6 +1,32 @@
 ---
 import BaseLayout from '../../layouts/BaseLayout.astro';
 import { adminAuth, adminFirestore } from '../../firebase/server';
+import { Timestamp } from 'firebase-admin/firestore';
+
+// Definir interfaces para tipar correctamente los datos
+interface Product {
+  id: string;
+  name: string;
+  price: number;
+  stock: number;
+  artistName?: string;
+  description?: string;
+  imageUrl?: string;
+}
+
+interface Order {
+  id: string;
+  orderId: string;
+  productId: string;
+  userId: string;
+  quantity: number;
+  createdAt: Timestamp;
+  status: string;
+  price: number;
+  total: number;
+  productName?: string;
+  buyerName?: string;
+}
 
 const sessionCookie = Astro.cookies.get('session')?.value;
 
@@ -10,8 +36,12 @@ if (!sessionCookie) {
 
 let user = null;
 let sellerData = null;
-let products = [];
-let orders = [];
+let products: Product[] = [];
+let orders: Order[] = [];
+let productsPage = 1;
+let ordersPage = 1;
+const PRODUCTS_PER_PAGE = 10;
+const ORDERS_PER_PAGE = 10;
 
 try {
   const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
@@ -34,35 +64,135 @@ try {
       sellerData = { sellerId, sellerName: user.email };
     }
 
-    // Obtener productos del vendedor
-    const sellerProductsSnapshot = await adminFirestore.collection('sellers').doc(sellerId).collection('products').get();
-    const sellerProducts = sellerProductsSnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    // Parámetros de paginación
+    const url = new URL(Astro.request.url);
+    productsPage = parseInt(url.searchParams.get('productsPage') || '1', 10);
+    ordersPage = parseInt(url.searchParams.get('ordersPage') || '1', 10);
+
+    // Obtener productos del vendedor con paginación
+    let productsQuery = adminFirestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('products')
+      .orderBy('productId')
+      .limit(PRODUCTS_PER_PAGE);
+
+    if (productsPage > 1) {
+      const previousProductsSnapshot = await adminFirestore
+        .collection('sellers')
+        .doc(sellerId)
+        .collection('products')
+        .orderBy('productId')
+        .limit((productsPage - 1) * PRODUCTS_PER_PAGE)
+        .get();
+
+      const lastProduct = previousProductsSnapshot.docs[previousProductsSnapshot.docs.length - 1];
+      if (lastProduct) {
+        productsQuery = productsQuery.startAfter(lastProduct);
+      }
+    }
+
+    const sellerProductsSnapshot = await productsQuery.get();
+
+    // Definir interfaz para los datos de los productos del vendedor
+    interface SellerProductData {
+      productId: string;
+      price: number;
+      stock: number;
+      // Otros campos si existen
+    }
+
+    // Mapear los productos del vendedor
+    const sellerProducts = sellerProductsSnapshot.docs.map(doc => {
+      const data = doc.data() as SellerProductData;
+      return { id: doc.id, ...data };
+    });
 
     // Obtener la información completa de cada producto desde la colección principal "products"
     const productPromises = sellerProducts.map(async (sellerProduct) => {
-      const productDoc = await adminFirestore.collection('products').doc(sellerProduct.id).get();
+      const productDoc = await adminFirestore.collection('products').doc(sellerProduct.productId).get();
       if (productDoc.exists) {
         const productData = productDoc.data();
         return {
-          ...sellerProduct,
+          id: sellerProduct.productId,
           name: productData?.name ?? 'Sin nombre',
+          price: sellerProduct.price ?? 0,
+          stock: sellerProduct.stock ?? 0,
           artistName: productData?.artistName ?? 'Artista desconocido',
           description: productData?.description ?? 'Sin descripción',
           imageUrl: productData?.imageUrl ?? '/default-image.png',
-        };
+        } as Product;
       } else {
         return {
-          ...sellerProduct,
-          name: 'Producto no disponible', // Si no se encuentra el producto en la colección principal
-        };
+          id: sellerProduct.productId,
+          name: 'Producto no disponible',
+          price: sellerProduct.price ?? 0,
+          stock: sellerProduct.stock ?? 0,
+        } as Product;
       }
     });
 
     products = await Promise.all(productPromises);
 
-    // Obtener órdenes del vendedor
-    const ordersSnapshot = await adminFirestore.collection('orders').where('sellerId', '==', sellerId).get();
-    orders = ordersSnapshot.docs.map(doc => doc.data());
+    // Obtener órdenes del vendedor con paginación
+    let ordersQuery = adminFirestore
+      .collection('orders')
+      .where('sellerId', '==', sellerId)
+      .orderBy('createdAt', 'desc')
+      .limit(ORDERS_PER_PAGE);
+
+    if (ordersPage > 1) {
+      const previousOrdersSnapshot = await adminFirestore
+        .collection('orders')
+        .where('sellerId', '==', sellerId)
+        .orderBy('createdAt', 'desc')
+        .limit((ordersPage - 1) * ORDERS_PER_PAGE)
+        .get();
+
+      const lastOrder = previousOrdersSnapshot.docs[previousOrdersSnapshot.docs.length - 1];
+      if (lastOrder) {
+        ordersQuery = ordersQuery.startAfter(lastOrder);
+      }
+    }
+
+    const ordersSnapshot = await ordersQuery.get();
+    const ordersData = ordersSnapshot.docs.map(doc => {
+      const data = doc.data();
+      return {
+        id: doc.id,
+        orderId: doc.id,
+        productId: data.productId,
+        userId: data.userId,
+        quantity: data.quantity,
+        createdAt: data.createdAt,
+        status: data.status,
+        price: data.price,
+        total: data.total,
+      } as Order;
+    });
+
+    // Enriquecer cada orden con el nombre del producto y del comprador
+    const orderPromises = ordersData.map(async (order) => {
+      const productId = order.productId;
+      const userId = order.userId;
+
+      // Obtener el nombre del producto
+      const productDoc = await adminFirestore.collection('products').doc(productId).get();
+      const productName = productDoc.exists ? productDoc.data()?.name : 'Producto no disponible';
+
+      // Obtener el nombre del comprador
+      const userDoc = await adminFirestore.collection('users').doc(userId).get();
+      const buyerName = userDoc.exists ? userDoc.data()?.displayName || userDoc.data()?.email : 'Usuario no disponible';
+
+      return {
+        ...order,
+        productName,
+        buyerName,
+      };
+    });
+
+    orders = await Promise.all(orderPromises);
+
   } else {
     return Astro.redirect('/no-autorizado');
   }
@@ -105,13 +235,25 @@ try {
       </tbody>
     </table>
 
+    <!-- Enlaces de paginación para productos -->
+    <div class="mt-4 flex justify-between">
+      {productsPage > 1 ? (
+        <a href={`/seller/dashboard?productsPage=${productsPage - 1}`} class="text-blue-600 hover:text-blue-900">Anterior</a>
+      ) : <span></span>}
+      {products.length === PRODUCTS_PER_PAGE ? (
+        <a href={`/seller/dashboard?productsPage=${productsPage + 1}`} class="text-blue-600 hover:text-blue-900">Siguiente</a>
+      ) : <span></span>}
+    </div>
+
     <!-- Enlace para agregar un nuevo producto -->
-    <a href="/seller/add-new-product" class="block bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
-      Agregar Nuevo Producto
-    </a>
-    <a href="/assignproduct" class="block bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
-      Asignar Precio y Stock a Producto Existente
-    </a>
+    <div class="mt-6 flex space-x-4">
+      <a href="/seller/add-new-product" class="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600">
+        Agregar Nuevo Producto
+      </a>
+      <a href="/assignproduct" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600">
+        Asignar Precio y Stock a Producto Existente
+      </a>
+    </div>
 
     <!-- Sección para ver órdenes -->
     <h3 class="text-2xl font-semibold mt-10 mb-4">Mis Ventas</h3>
@@ -119,9 +261,12 @@ try {
       <!-- Encabezado de la tabla -->
       <thead>
         <tr>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Orden ID</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Comprador</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Producto</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Cantidad</th>
           <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Fecha</th>
+          <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Estado</th>
           <th class="px-6 py-3"></th>
         </tr>
       </thead>
@@ -129,17 +274,73 @@ try {
       <tbody class="bg-white divide-y divide-gray-200">
         {orders.map(order => (
           <tr>
+            <td class="px-6 py-4">{order.orderId}</td>
+            <td class="px-6 py-4">{order.buyerName}</td>
             <td class="px-6 py-4">{order.productName}</td>
             <td class="px-6 py-4">{order.quantity}</td>
             <td class="px-6 py-4">
-            {order.date ? new Date(order.date.seconds * 1000).toLocaleString() : 'Fecha no disponible'}
+              {order.createdAt ? order.createdAt.toDate().toLocaleString() : 'Fecha no disponible'}
             </td>
+            <td class="px-6 py-4">{order.status}</td>
             <td class="px-6 py-4 text-right">
-              <!-- Opcionalmente, agregar acciones para gestionar la orden -->
+              {order.status !== 'Completado' && (
+                <button
+                  class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 mark-as-completed"
+                  data-order-id={order.orderId}
+                >
+                  Marcar como Completada
+                </button>
+              )}
             </td>
           </tr>
         ))}
       </tbody>
     </table>
+
+    <!-- Enlaces de paginación para órdenes -->
+    <div class="mt-4 flex justify-between">
+      {ordersPage > 1 ? (
+        <a href={`/seller/dashboard?ordersPage=${ordersPage - 1}`} class="text-blue-600 hover:text-blue-900">Anterior</a>
+      ) : <span></span>}
+      {orders.length === ORDERS_PER_PAGE ? (
+        <a href={`/seller/dashboard?ordersPage=${ordersPage + 1}`} class="text-blue-600 hover:text-blue-900">Siguiente</a>
+      ) : <span></span>}
+    </div>
   </section>
+
+  <!-- Script para manejar eventos -->
+  <script is:inline>
+    document.addEventListener('DOMContentLoaded', () => {
+      const buttons = document.querySelectorAll('.mark-as-completed');
+      buttons.forEach(button => {
+        button.addEventListener('click', async () => {
+          const orderId = button.getAttribute('data-order-id');
+          if (confirm('¿Estás seguro de marcar esta orden como completada?')) {
+            try {
+              const response = await fetch('/api/complete-order', {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ orderId }),
+              });
+
+              const result = await response.json();
+
+              if (response.ok) {
+                alert('Orden marcada como completada');
+                // Recargar la página para actualizar el estado
+                window.location.reload();
+              } else {
+                alert('Error: ' + result.message);
+              }
+            } catch (error) {
+              console.error('Error al marcar la orden como completada:', error);
+              alert('Error al marcar la orden como completada');
+            }
+          }
+        });
+      });
+    });
+  </script>
 </BaseLayout>

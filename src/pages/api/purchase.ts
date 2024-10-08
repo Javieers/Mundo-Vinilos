@@ -2,7 +2,7 @@
 
 import type { APIRoute } from 'astro';
 import { adminAuth, adminFirestore } from '../../firebase/server';
-import { FieldValue } from 'firebase-admin/firestore';
+import admin from 'firebase-admin'; // Importamos 'admin' desde 'firebase-admin'
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const sessionCookie = cookies.get('session')?.value;
@@ -40,11 +40,16 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     // Referencias a Firestore
     const productRef = adminFirestore.collection('products').doc(productId);
-    const sellerProductRef = adminFirestore.collection('sellers').doc(sellerId).collection('products').doc(productId);
+    const sellerProductRef = adminFirestore
+      .collection('sellers')
+      .doc(sellerId)
+      .collection('products')
+      .doc(productId);
     const userPurchasesRef = adminFirestore.collection('users').doc(userId).collection('purchases');
+    const ordersRef = adminFirestore.collection('orders');
 
     // Generar un número de orden único
-    const orderId = adminFirestore.collection('orders').doc().id;
+    const orderId = ordersRef.doc().id;
 
     // Ejecutar la compra en una transacción para asegurar la consistencia
     await adminFirestore.runTransaction(async (transaction) => {
@@ -67,32 +72,46 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
       // Actualizar el stock del vendedor
       transaction.update(sellerProductRef, {
-        stock: FieldValue.increment(-quantity),
+        stock: admin.firestore.FieldValue.increment(-quantity),
       });
 
-      // Registrar la compra en la subcolección de compras del usuario
+      // Registrar la compra en un objeto
       const purchaseData = {
-        orderId,  // Guardar el ID de la orden
+        orderId, // Guardar el ID de la orden
         productId: productId,
         sellerId: sellerId,
+        userId: userId,
         price: price,
         quantity: quantity,
         total: price * quantity,
-        purchasedAt: FieldValue.serverTimestamp(),
+        status: 'Pendiente',
+        createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 
-      transaction.set(userPurchasesRef.doc(orderId), purchaseData); // Usar orderId como ID del documento
+      // Registrar la compra en la subcolección de compras del usuario
+      transaction.set(userPurchasesRef.doc(orderId), purchaseData);
+
+      // Registrar la orden en la colección 'orders'
+      transaction.set(ordersRef.doc(orderId), purchaseData);
     });
 
-    return new Response(JSON.stringify({ message: 'Compra realizada con éxito', orderId }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ message: 'Compra realizada con éxito', orderId }),
+      {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   } catch (error: any) {
     console.error('Error al procesar la compra:', error);
-    return new Response(JSON.stringify({ message: `Error al procesar la compra: ${error.message}` }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({
+        message: `Error al procesar la compra: ${error.message}`,
+      }),
+      {
+        status: 500,
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
   }
 };
