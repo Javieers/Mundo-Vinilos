@@ -5,6 +5,7 @@ import admin from 'firebase-admin';
 import express from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
+import { Timestamp } from 'firebase-admin/firestore';
 
 // Verificar que las variables de entorno estén definidas
 if (!process.env.FIREBASE_PROJECT_ID || !process.env.FIREBASE_PRIVATE_KEY || !process.env.FIREBASE_CLIENT_EMAIL) {
@@ -296,6 +297,12 @@ export async function getSellerInfo(sellerId: string) {
     }
 
     const sellerData = sellerSnapshot.data();
+
+    // Verifica que sellerData no sea undefined
+    if (!sellerData) {
+      throw new Error('Datos del vendedor no disponibles');
+    }
+
     const productSnapshot = await sellerRef.collection('products').get();
 
     const products = await Promise.all(
@@ -310,6 +317,8 @@ export async function getSellerInfo(sellerId: string) {
             price: sellerProductData.price,
             stock: sellerProductData.stock,
             name: 'Producto no disponible',
+            description: 'Descripción no disponible',
+            imageUrl: '/default-image.png',
           };
         }
 
@@ -326,9 +335,18 @@ export async function getSellerInfo(sellerId: string) {
 
     return {
       seller: {
-        sellerName: sellerData?.sellerName,
-        sellerImage: sellerData?.sellerImage || '',
-        reviews: sellerData?.reviews || [],
+        storeName: sellerData.storeName || '',
+        sellerName: sellerData.sellerName || '',
+        direccion: sellerData.direccion || '',
+        email: sellerData.email || '',
+        region: sellerData.region || '',
+        comuna: sellerData.comuna || '',
+        numeroTelefonico: sellerData.numeroTelefonico || '',
+        redesSociales: sellerData.redesSociales || '',
+        horarioAtencion: sellerData.horarioAtencion || { desde: '', hasta: '' },
+        sellerImage: sellerData.sellerImage || '',
+        updatedAt: sellerData.updatedAt ? (sellerData.updatedAt as Timestamp).toDate() : null,
+        reviews: sellerData.reviews || [],
       },
       products,
     };

@@ -1,6 +1,7 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";  // Verifica la ruta correcta
 import { getSellerInfo } from '../../firebase/server';  // Asegúrate de que el archivo sea el correcto
+import { format } from 'date-fns'; // Librería para formatear fechas, instala si no la tienes
 
 const { id } = Astro.params;
 const sellerInfo = await getSellerInfo(id);  // Obtener los datos del vendedor
@@ -10,15 +11,46 @@ if (!sellerInfo) {
 }
 
 const { seller, products } = sellerInfo;
----
 
+// Formatear la fecha de actualización si está disponible
+const formattedUpdatedAt = seller.updatedAt
+  ? format(seller.updatedAt, 'dd de MMMM de yyyy, h:mm:ss aaaa')
+  : 'No disponible';
+---
 <BaseLayout>
   <section>
     <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
       <div class="bg-white p-6 rounded-lg shadow-lg">
-        <img src={seller.sellerImage} alt={seller.sellerName} class="w-full h-auto max-h-96 object-contain rounded-md" />
-        <h3 class="mt-4 text-lg font-semibold">{seller.sellerName}</h3>
+        <!-- Imagen del Vendedor -->
+        <img src={seller.sellerImage} alt={seller.storeName} class="w-full h-auto max-h-96 object-contain rounded-md" />
 
+        <!-- Información Básica -->
+        <h3 class="mt-4 text-lg font-semibold">{seller.storeName}</h3>
+        <p class="text-gray-700"><strong>Nombre del Vendedor:</strong> {seller.sellerName}</p>
+        <p class="text-gray-700"><strong>Dirección:</strong> {seller.direccion}</p>
+        <p class="text-gray-700"><strong>Email:</strong> {seller.email}</p>
+        <p class="text-gray-700"><strong>Región:</strong> {seller.region}</p>
+        {seller.region === 'Región Metropolitana' && (
+          <p class="text-gray-700"><strong>Comuna:</strong> {seller.comuna}</p>
+        )}
+        {seller.numeroTelefonico && (
+          <p class="text-gray-700"><strong>Número Telefónico:</strong> {seller.numeroTelefonico}</p>
+        )}
+        {seller.redesSociales && (
+          <p class="text-gray-700"><strong>Redes Sociales:</strong> {seller.redesSociales}</p>
+        )}
+
+        <!-- Horario de Atención -->
+        <div class="mt-4">
+          <h4 class="text-xl font-semibold">Horario de Atención</h4>
+          <p class="text-gray-700"><strong>Desde:</strong> {seller.horarioAtencion.desde}</p>
+          <p class="text-gray-700"><strong>Hasta:</strong> {seller.horarioAtencion.hasta}</p>
+        </div>
+
+        <!-- Fecha de Actualización -->
+        <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {formattedUpdatedAt}</p>
+
+        <!-- Productos Disponibles -->
         <h4 class="mt-8 text-xl font-semibold">Productos Disponibles</h4>
         <ul class="mt-4">
           {products.length > 0 ? (
@@ -32,6 +64,7 @@ const { seller, products } = sellerInfo;
           )}
         </ul>
 
+        <!-- Reseñas -->
         <h4 class="mt-12 text-xl font-semibold">Reseñas</h4>
         <div class="mt-4">
           {seller.reviews.length > 0 ? (
@@ -49,5 +82,3 @@ const { seller, products } = sellerInfo;
     </div>
   </section>
 </BaseLayout>
-
-

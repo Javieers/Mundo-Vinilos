@@ -43,6 +43,9 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const sellerProductRef = adminFirestore.collection('sellers').doc(sellerId).collection('products').doc(productId);
     const userPurchasesRef = adminFirestore.collection('users').doc(userId).collection('purchases');
 
+    // Generar un número de orden único
+    const orderId = adminFirestore.collection('orders').doc().id;
+
     // Ejecutar la compra en una transacción para asegurar la consistencia
     await adminFirestore.runTransaction(async (transaction) => {
       const productDoc = await transaction.get(productRef);
@@ -69,6 +72,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
       // Registrar la compra en la subcolección de compras del usuario
       const purchaseData = {
+        orderId,  // Guardar el ID de la orden
         productId: productId,
         sellerId: sellerId,
         price: price,
@@ -77,10 +81,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         purchasedAt: FieldValue.serverTimestamp(),
       };
 
-      transaction.set(userPurchasesRef.doc(), purchaseData);
+      transaction.set(userPurchasesRef.doc(orderId), purchaseData); // Usar orderId como ID del documento
     });
 
-    return new Response(JSON.stringify({ message: 'Compra realizada con éxito' }), {
+    return new Response(JSON.stringify({ message: 'Compra realizada con éxito', orderId }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     });

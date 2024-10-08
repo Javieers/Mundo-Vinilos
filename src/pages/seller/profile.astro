@@ -43,11 +43,151 @@ if (sessionCookie) {
           name="storeName"
           class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
           required
-          value={sellerData?.name || ''}
+          value={sellerData?.storeName || ''}
         />
       </div>
 
-      <!-- Otros campos adicionales que desees -->
+      <!-- Dirección -->
+      <div>
+        <label for="direccion" class="block text-sm font-medium text-gray-700">Dirección</label>
+        <input
+          type="text"
+          id="direccion"
+          name="direccion"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+          required
+          value={sellerData?.direccion || ''}
+        />
+      </div>
+
+      <!-- Región -->
+      <div>
+        <label for="region" class="block text-sm font-medium text-gray-700">Región</label>
+        <select
+          id="region"
+          name="region"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+          required
+        >
+          <option value="">Seleccione una región</option>
+          <option value="Arica y Parinacota">Arica y Parinacota</option>
+          <option value="Tarapacá">Tarapacá</option>
+          <option value="Antofagasta">Antofagasta</option>
+          <option value="Atacama">Atacama</option>
+          <option value="Coquimbo">Coquimbo</option>
+          <option value="Valparaíso">Valparaíso</option>
+          <option value="Región Metropolitana">Región Metropolitana</option>
+          <option value="O'Higgins">O'Higgins</option>
+          <option value="Maule">Maule</option>
+          <option value="Ñuble">Ñuble</option>
+          <option value="Biobío">Biobío</option>
+          <option value="Araucanía">Araucanía</option>
+          <option value="Los Ríos">Los Ríos</option>
+          <option value="Los Lagos">Los Lagos</option>
+          <option value="Aysén">Aysén</option>
+          <option value="Magallanes">Magallanes</option>
+        </select>
+      </div>
+
+      <!-- Comuna (solo si Región Metropolitana) -->
+      <div id="comunaContainer" class="hidden">
+        <label for="comuna" class="block text-sm font-medium text-gray-700">Comuna</label>
+        <select
+          id="comuna"
+          name="comuna"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+        >
+          <option value="">Seleccione una comuna</option>
+          <option value="Santiago">Santiago</option>
+          <option value="Providencia">Providencia</option>
+          <option value="Las Condes">Las Condes</option>
+          <option value="Ñuñoa">Ñuñoa</option>
+          <option value="La Florida">La Florida</option>
+          <option value="Vitacura">Vitacura</option>
+          <option value="Maipú">Maipú</option>
+          <option value="La Reina">La Reina</option>
+          <option value="Peñalolén">Peñalolén</option>
+          <option value="Recoleta">Recoleta</option>
+          <option value="Quilicura">Quilicura</option>
+          <option value="Quinta Normal">Quinta Normal</option>
+          <option value="Pudahuel">Pudahuel</option>
+          <option value="Lo Prado">Lo Prado</option>
+          <option value="Renca">Renca</option>
+          <option value="El Bosque">El Bosque</option>
+          <option value="Estación Central">Estación Central</option>
+          <option value="Huechuraba">Huechuraba</option>
+          <option value="Conchalí">Conchalí</option>
+          <option value="Independencia">Independencia</option>
+          <option value="Macul">Macul</option>
+          <!-- Agrega todas las comunas de Santiago de Chile aquí -->
+        </select>
+      </div>
+
+      <!-- Número Telefónico (Opcional) -->
+      <div>
+        <label for="numeroTelefonico" class="block text-sm font-medium text-gray-700">Número Telefónico (Opcional)</label>
+        <input
+          type="text"
+          id="numeroTelefonico"
+          name="numeroTelefonico"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+          value={sellerData?.numeroTelefonico || ''}
+        />
+      </div>
+
+      <!-- Redes Sociales (Opcional) -->
+      <div>
+        <label for="redesSociales" class="block text-sm font-medium text-gray-700">Redes Sociales (Opcional)</label>
+        <input
+          type="text"
+          id="redesSociales"
+          name="redesSociales"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+          value={sellerData?.redesSociales || ''}
+        />
+      </div>
+
+      <!-- Horario de Atención -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Horario de Atención</label>
+        <div class="flex space-x-4">
+          <div>
+            <label for="desde" class="block text-sm font-medium text-gray-700">Desde</label>
+            <input
+              type="time"
+              id="desde"
+              name="horarioAtencion_desde"
+              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+              required
+              value={sellerData?.horarioAtencion?.desde || ''}
+            />
+          </div>
+          <div>
+            <label for="hasta" class="block text-sm font-medium text-gray-700">Hasta</label>
+            <input
+              type="time"
+              id="hasta"
+              name="horarioAtencion_hasta"
+              class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+              required
+              value={sellerData?.horarioAtencion?.hasta || ''}
+            />
+          </div>
+        </div>
+      </div>
+
+      <!-- Imagen URL -->
+      <div>
+        <label for="sellerImage" class="block text-sm font-medium text-gray-700">Imagen URL</label>
+        <input
+          type="url"
+          id="sellerImage"
+          name="sellerImage"
+          class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-3"
+          required
+          value={sellerData?.sellerImage || ''}
+        />
+      </div>
 
       <!-- Botón de Guardar -->
       <div>
@@ -61,14 +201,96 @@ if (sessionCookie) {
     </form>
   </section>
 
-  <script>
-    document.getElementById('sellerProfileForm').addEventListener('submit', async (event) => {
-      event.preventDefault();
+  <script type="module">
+    // Obtener los elementos del formulario
+    const sellerProfileForm = document.getElementById('sellerProfileForm');
+    const regionSelect = document.getElementById('region');
+    const comunaContainer = document.getElementById('comunaContainer');
+    const comunaSelect = document.getElementById('comuna');
 
-      const storeNameInput = document.getElementById('storeName');
+    if (!sellerProfileForm || !regionSelect || !comunaContainer || !comunaSelect) {
+      console.error('Uno o más elementos del formulario no se encontraron.');
+    } else {
+      // Mostrar u ocultar el campo de comuna basado en la región seleccionada
+      regionSelect.addEventListener('change', (event) => {
+        const selectedRegion = event.target.value;
+        if (selectedRegion === 'Región Metropolitana') {
+          comunaContainer.classList.remove('hidden');
+        } else {
+          comunaContainer.classList.add('hidden');
+        }
+      });
 
-      if (storeNameInput instanceof HTMLInputElement) {
-        const storeName = storeNameInput.value;
+      // Manejar el envío del formulario
+      sellerProfileForm.addEventListener('submit', async (event) => {
+        event.preventDefault();
+
+        // Obtener los valores de los campos
+        const storeNameInput = document.getElementById('storeName');
+        const direccionInput = document.getElementById('direccion');
+        const regionInput = document.getElementById('region');
+        const comunaInput = document.getElementById('comuna');
+        const numeroTelefonicoInput = document.getElementById('numeroTelefonico');
+        const redesSocialesInput = document.getElementById('redesSociales');
+        const desdeInput = document.getElementById('desde');
+        const hastaInput = document.getElementById('hasta');
+        const sellerImageInput = document.getElementById('sellerImage');
+
+        if (
+          !storeNameInput ||
+          !direccionInput ||
+          !regionInput ||
+          !desdeInput ||
+          !hastaInput ||
+          !sellerImageInput
+        ) {
+          alert('Error al obtener los datos del formulario.');
+          return;
+        }
+
+        // Validar los campos obligatorios
+        const storeName = storeNameInput.value.trim();
+        const direccion = direccionInput.value.trim();
+        const region = regionInput.value;
+        const comuna = region === 'Región Metropolitana' && comunaInput ? comunaInput.value : '';
+        const numeroTelefonico = numeroTelefonicoInput ? numeroTelefonicoInput.value.trim() : '';
+        const redesSociales = redesSocialesInput ? redesSocialesInput.value.trim() : '';
+        const desde = desdeInput.value;
+        const hasta = hastaInput.value;
+        const sellerImage = sellerImageInput.value.trim();
+
+        if (
+          !storeName ||
+          !direccion ||
+          !region ||
+          (region === 'Región Metropolitana' && !comuna) ||
+          !desde ||
+          !hasta ||
+          !sellerImage
+        ) {
+          alert('Faltan campos obligatorios');
+          return;
+        }
+
+        // Crear el objeto horarioAtencion
+        const horarioAtencion = {
+          desde,
+          hasta,
+        };
+
+        // Crear el objeto de datos a enviar
+        const data = {
+          storeName,
+          direccion,
+          region,
+          comuna: region === 'Región Metropolitana' ? comuna : '',
+          numeroTelefonico: numeroTelefonico || null,
+          redesSociales: redesSociales || null,
+          horarioAtencion,
+          sellerImage,
+        };
+
+        console.log('Datos a enviar al backend:', data); // Log para depuración
 
         try {
           const response = await fetch('/api/seller/updateProfile', {
@@ -76,9 +298,7 @@ if (sessionCookie) {
             headers: {
               'Content-Type': 'application/json',
             },
-            body: JSON.stringify({
-              name: storeName,
-            }),
+            body: JSON.stringify(data),
           });
 
           const result = await response.json();
@@ -89,14 +309,15 @@ if (sessionCookie) {
             window.location.reload();
           } else {
             alert('Error: ' + result.message);
+            if (result.missingFields) {
+              console.warn('Campos faltantes:', result.missingFields);
+            }
           }
         } catch (error) {
           console.error('Error al actualizar el perfil:', error);
           alert('Error al actualizar el perfil');
         }
-      } else {
-        alert('Error al obtener los datos del formulario.');
-      }
-    });
+      });
+    }
   </script>
 </BaseLayout>
