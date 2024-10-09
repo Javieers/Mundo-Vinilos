@@ -37,22 +37,53 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       .collection('products')
       .doc(productId);
 
+    // Obtener los datos del producto principal
+    const productDoc = await adminFirestore.collection('products').doc(productId).get();
+
+    if (!productDoc.exists) {
+      return new Response(JSON.stringify({ message: 'El producto no existe.' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    const productData = productDoc.data();
+
+    // Definir el tipo de datos del producto del vendedor
+    interface SellerProductData {
+      productId: string;
+      name: string;
+      artistName: string;
+      description: string;
+      imageUrl: string;
+      price: number;
+      stock: number;
+      updatedAt: FirebaseFirestore.FieldValue;
+      createdAt?: FirebaseFirestore.FieldValue; // Propiedad opcional
+    }
+
+    // Preparar los datos para guardar en la subcolección del vendedor
+    const sellerProductData: SellerProductData = {
+      productId: productId,
+      name: productData.name ?? '',
+      artistName: productData.artistName ?? '',
+      description: productData.description ?? '',
+      imageUrl: productData.imageUrl ?? '',
+      price: price,
+      stock: stock,
+      updatedAt: admin.firestore.FieldValue.serverTimestamp(),
+    };
+
     // Intentar obtener el documento para verificar si ya existe
     const sellerProductDoc = await sellerProductRef.get();
 
     if (sellerProductDoc.exists) {
-      await sellerProductRef.update({
-        price: price,
-        stock: stock,
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      // Si el documento existe, actualizamos los datos usando 'set' con 'merge: true'
+      await sellerProductRef.set(sellerProductData, { merge: true });
     } else {
-      await sellerProductRef.set({
-        price: price,
-        stock: stock,
-        createdAt: admin.firestore.FieldValue.serverTimestamp(),
-        updatedAt: admin.firestore.FieldValue.serverTimestamp(),
-      });
+      // Si el documento no existe, agregamos 'createdAt' y creamos el documento
+      sellerProductData.createdAt = admin.firestore.FieldValue.serverTimestamp();
+      await sellerProductRef.set(sellerProductData);
     }
 
     return new Response(JSON.stringify({ message: 'Precio y stock asignados correctamente.' }), {
@@ -60,6 +91,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (error: any) {
+    console.error('Error al asignar el producto:', error);
     return new Response(JSON.stringify({ message: 'Error al asignar el producto.' }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },

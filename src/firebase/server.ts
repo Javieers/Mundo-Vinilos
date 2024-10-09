@@ -135,24 +135,29 @@ export async function getProducts() {
       name: doc.data().name ?? 'Sin nombre',
       artistName: doc.data().artistName ?? 'Artista desconocido',
       description: doc.data().description ?? 'Sin descripción',
-      imageUrl: doc.data().imageUrl ?? '/default-image.png', // Imagen por defecto si no existe
+      imageUrl: doc.data().imageUrl ?? '/default-image.png',
       createdAt: doc.data().createdAt,
     }));
 
-    // Obtener los precios de todos los productos de la subcolección 'sellers/products'
+    // Obtener los precios de todos los productos de las subcolecciones 'sellers/products'
     const sellersProductsSnapshot = await adminFirestore.collectionGroup('products').get();
 
-    const priceMap: { [key: string]: number } = {};
+    const priceMap = {};
 
     sellersProductsSnapshot.docs.forEach(doc => {
       const data = doc.data();
       const productId = data.productId;
       const price = data.price;
 
-      if (priceMap[productId] != null) {
-        priceMap[productId] = Math.min(priceMap[productId], price);
+      // Validar que 'productId' y 'price' estén definidos y que 'price' sea un número
+      if (productId && typeof price === 'number') {
+        if (priceMap[productId] != null) {
+          priceMap[productId] = Math.min(priceMap[productId], price);
+        } else {
+          priceMap[productId] = price;
+        }
       } else {
-        priceMap[productId] = price;
+        console.warn(`Datos inválidos en el producto del vendedor: doc.id=${doc.id}, productId=${productId}, price=${price}`);
       }
     });
 
