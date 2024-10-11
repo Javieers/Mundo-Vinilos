@@ -3,6 +3,7 @@ import BaseLayout from '../../layouts/BaseLayout.astro';
 import { adminAuth, adminFirestore } from '../../firebase/server';
 import { getSellerInfo } from '../../firebase/server';
 import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const { orderId } = Astro.params;
 const sessionCookie = Astro.cookies.get('session')?.value;
@@ -47,6 +48,17 @@ try {
   console.error('Error al obtener la orden o la información del vendedor:', error);
   return Astro.redirect('/login');
 }
+
+// Verificar si es preventa y si la fecha de salida aún no ha pasado
+let isPreOrderActive = false;
+let formattedReleaseDate = null;
+
+if (order && order.isPreOrder && order.releaseDate) {
+  const currentDate = new Date();
+  const releaseDate = order.releaseDate.toDate(); // Convertir Timestamp a Date
+  isPreOrderActive = releaseDate > currentDate;
+  formattedReleaseDate = format(releaseDate, "dd 'de' MMMM 'de' yyyy", { locale: es });
+}
 ---
 <BaseLayout>
   <section class="p-6 flex justify-center items-center bg-gray-100 min-h-screen">
@@ -56,7 +68,11 @@ try {
       <!-- Mensaje Informativo -->
       <div class="bg-green-100 border-l-4 border-green-500 text-green-700 p-4 mb-6" role="alert">
         <p class="font-bold">¡Gracias por tu compra!</p>
-        <p>Por favor, sigue las instrucciones a continuación para retirar tu producto.</p>
+        {isPreOrderActive ? (
+          <p>Este es un producto en reserva. Podrás retirarlo a partir del {formattedReleaseDate}.</p>
+        ) : (
+          <p>Por favor, sigue las instrucciones a continuación para retirar tu producto.</p>
+        )}
       </div>
 
       {order && product ? (
@@ -68,6 +84,12 @@ try {
 
           <!-- Información del Producto y Vendedor -->
           <div class="lg:w-2/3 lg:pl-6 mt-4 lg:mt-0">
+            <!-- Mostrar "RESERVA" si es preventa activa -->
+            {isPreOrderActive && (
+              <div class="mb-2">
+                <span class="bg-yellow-400 text-black px-2 py-1 rounded">RESERVA</span>
+              </div>
+            )}
             <p class="text-xl font-semibold">{product.name}</p>
             <p class="text-gray-600 mt-2"><strong>Tienda:</strong> {sellerInfo?.seller?.storeName || order.storeName || 'No disponible'}</p>
             <p class="text-gray-600"><strong>Precio:</strong> ${order.price.toFixed(2)}</p>
@@ -96,7 +118,7 @@ try {
                   <p class="text-gray-700"><strong>Desde:</strong> {sellerInfo.seller.horarioAtencion?.desde || 'No disponible'}</p>
                   <p class="text-gray-700"><strong>Hasta:</strong> {sellerInfo.seller.horarioAtencion?.hasta || 'No disponible'}</p>
                 </div>
-                <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {sellerInfo.seller.updatedAt ? format(sellerInfo.seller.updatedAt, 'dd de MMMM de yyyy, h:mm:ss aaaa') : 'No disponible'}</p>
+                <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {sellerInfo.seller.updatedAt ? format(sellerInfo.seller.updatedAt, 'dd de MMMM de yyyy, h:mm:ss aaaa', { locale: es }) : 'No disponible'}</p>
               </div>
             ) : (
               <p class="text-red-600 mt-4">Información del vendedor no disponible.</p>
@@ -105,7 +127,11 @@ try {
             <!-- Instrucciones de Retiro -->
             <div class="mt-6 bg-blue-100 border-l-4 border-blue-500 text-blue-700 p-4">
               <p class="font-bold">Instrucciones para Retirar tu Producto</p>
-              <p>Debes acercarte con el número de orden al local en los horarios de atención indicados. ¡Gracias por tu compra!</p>
+              {isPreOrderActive ? (
+                <p>Este producto estará disponible para retiro a partir del {formattedReleaseDate}. Por favor, acércate al local con tu número de orden desde esa fecha en adelante.</p>
+              ) : (
+                <p>Debes acercarte con el número de orden al local en los horarios de atención indicados. ¡Gracias por tu compra!</p>
+              )}
             </div>
           </div>
         </div>

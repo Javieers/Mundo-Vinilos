@@ -2,7 +2,7 @@
 
 import type { APIRoute } from 'astro';
 import { adminAuth, adminFirestore } from '../../firebase/server';
-import admin from 'firebase-admin'; // Importamos 'admin' desde 'firebase-admin'
+import admin from 'firebase-admin';
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const sessionCookie = cookies.get('session')?.value;
@@ -64,6 +64,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         throw new Error('El vendedor no ofrece este producto');
       }
 
+      const productData = productDoc.data();
       const sellerProductData = sellerProductDoc.data();
 
       if (sellerProductData.stock < quantity) {
@@ -75,6 +76,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         stock: admin.firestore.FieldValue.increment(-quantity),
       });
 
+      // Obtener campos adicionales del producto
+      const isPreOrder = productData?.isPreOrder ?? false;
+      const releaseDate = productData?.releaseDate ?? null;
+
       // Registrar la compra en un objeto
       const purchaseData = {
         orderId, // Guardar el ID de la orden
@@ -85,6 +90,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         quantity: quantity,
         total: price * quantity,
         status: 'Pendiente',
+        isPreOrder,
+        releaseDate,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
       };
 

@@ -22,16 +22,47 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Obtener el cuerpo de la solicitud
     const data = await request.json();
 
-    const { name, artistName, albumName, description, imageUrl } = data;
+    const {
+      name,
+      artistName,
+      albumName,
+      genres,
+      tracklist,
+      additionalInfo,
+      imageUrl,
+      isPreOrder,
+      releaseDate,
+    } = data;
 
     // Validar campos requeridos
-    if (!name || !artistName || !albumName || !description || !imageUrl) {
+    if (
+      !name ||
+      !artistName ||
+      !albumName ||
+      !genres ||
+      !Array.isArray(genres) ||
+      genres.length === 0 ||
+      !tracklist ||
+      !imageUrl
+    ) {
       console.error('Missing required fields:', data);
-      return new Response(JSON.stringify({ message: 'Todos los campos son requeridos.' }), {
+      return new Response(JSON.stringify({ message: 'Todos los campos obligatorios son requeridos.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
     }
+
+    // Si es preventa, validar que releaseDate esté presente
+    if (isPreOrder && !releaseDate) {
+      console.error('Release date is required for pre-orders.');
+      return new Response(JSON.stringify({ message: 'La fecha de salida es requerida para preventas.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Convertir releaseDate a Timestamp de Firestore si está presente
+    const releaseDateTimestamp = releaseDate ? admin.firestore.Timestamp.fromDate(new Date(releaseDate)) : null;
 
     // Agregar producto a la colección "products"
     const productRef = adminFirestore.collection('products').doc(); // Genera un nuevo ID
@@ -39,8 +70,12 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       name,
       artistName,
       albumName,
-      description,
+      genres,
+      tracklist,
+      additionalInfo: additionalInfo || '',
       imageUrl,
+      isPreOrder: isPreOrder || false,
+      releaseDate: releaseDateTimestamp,
       createdAt: admin.firestore.FieldValue.serverTimestamp(),
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     });

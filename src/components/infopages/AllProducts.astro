@@ -1,61 +1,324 @@
 ---
 import { getAllProducts } from '../../firebase/server';
 
+// Obtener todos los productos
 const products = await getAllProducts();
+
+// Extraer todos los géneros únicos para el filtro
+const allGenres = Array.from(new Set(products.flatMap(product => product.genres)));
+
+// Filtrar precios válidos para calcular el rango
+const validPrices = products
+  .filter(product => typeof product.price === 'number' && product.price !== null)
+  .map(product => product.price);
+
+// Determinar el precio mínimo y máximo
+const minPrice = validPrices.length > 0 ? Math.min(...validPrices) : 0;
+const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 1000;
 ---
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Todos los Vinilos</title>
+  <!-- Incluir Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Estilos adicionales para mejorar la apariencia */
+    #genre-list.hidden {
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <section>
+    <div class="mx-auto w-full lg:px-24 max-w-6xl md:px-12 items-center px-8 py-24">
+      <div>
+        <div class="text-center max-w-4xl mx-auto">
+          <h1 class="text-4xl tracking-tight font-semibold text-black md:text-5xl font-display mt-8">Todos los Vinilos</h1>
+          <p class="text-gray-500 lg:text-xl max-w-2xl mt-4 mx-auto text-base">Encuentra todos los vinilos disponibles en nuestra tienda.</p>
 
-<section>
-  <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
-    <div>
-      <div class="text-center max-w-4xl mx-auto">
-        <p class="text-4xl tracking-tight font-semibold text-black md:text-5xl font-display mt-8">Todos los Vinilos</p>
-        <p class="text-gray-500 lg:text-xl max-w-2xl mt-4 mx-auto text-base">Encuentra todos los vinilos disponibles en nuestra tienda.</p>
+          <!-- Barra de búsqueda y Filtros -->
+          <div class="mt-8 flex flex-col items-center">
+            <!-- Barra de Búsqueda -->
+            <div class="w-full mb-6">
+              <input 
+                type="text" 
+                id="search-bar"
+                placeholder="Buscar por nombre o artista..."
+                class="w-full px-6 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg"
+              />
+            </div>
 
-        <!-- Barra de búsqueda -->
-        <div class="mt-6">
-          <input 
-            type="text" 
-            id="search-bar"
-            placeholder="Buscar vinilo..."
-            class="w-full px-4 py-2 border rounded-md"
-          />
+            <!-- Contenedor de Filtros Centrados -->
+            <div class="w-full flex flex-col md:flex-row md:justify-center md:space-x-6 space-y-6 md:space-y-0">
+              <!-- Filtro de Género Musical -->
+              <div class="flex flex-col items-center">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Género Musical</label>
+                <!-- Botón para alternar la visibilidad de los géneros -->
+                <button id="toggle-genres" class="flex items-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 focus:outline-none transition-colors duration-200">
+                  <span id="toggle-genres-text">Mostrar géneros</span>
+                  <svg id="toggle-genres-icon" class="w-3 h-3 ml-2 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                <!-- Lista de Géneros, inicialmente oculta -->
+                <div id="genre-list" class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-gray-300 rounded-md p-2 hidden">
+                  {allGenres.map(genre => (
+                    <label class="inline-flex items-center">
+                      <input
+                        type="checkbox"
+                        class="form-checkbox h-5 w-5 text-indigo-600"
+                        value={genre}
+                        name="genre"
+                      />
+                      <span class="ml-3 text-gray-700">{genre}</span>
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              <!-- Filtro de Rango de Precio -->
+              <div class="flex flex-col items-center">
+                <label class="block text-sm font-medium text-gray-700 mb-2">Rango de Precio</label>
+                <div class="flex justify-between space-x-4 mt-2">
+                  <input 
+                    type="number" 
+                    id="min-price"
+                    placeholder={`Min: $${minPrice.toLocaleString('es-ES')}`}
+                    class="w-1/2 px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg"
+                    min={minPrice}
+                    max={maxPrice}
+                  />
+                  <input 
+                    type="number" 
+                    id="max-price"
+                    placeholder={`Max: $${maxPrice.toLocaleString('es-ES')}`}
+                    class="w-1/2 px-4 py-3 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg"
+                    min={minPrice}
+                    max={maxPrice}
+                  />
+                </div>
+              </div>
+
+              <!-- Filtro de Ordenamiento -->
+              <div class="flex flex-col items-center">
+                <label for="sort-order" class="block text-sm font-medium text-gray-700 mb-2">Ordenar Por</label>
+                <select id="sort-order" class="mt-2 block w-full border border-gray-300 rounded-md shadow-sm p-3 focus:outline-none focus:ring-2 focus:ring-indigo-500 text-lg">
+                  <option value="">Sin Ordenar</option>
+                  <option value="price-asc">Precio: Menor a Mayor</option>
+                  <option value="price-desc">Precio: Mayor a Menor</option>
+                  <option value="date-asc">Fecha de Publicación: Antiguo a Nuevo</option>
+                  <option value="date-desc">Fecha de Publicación: Nuevo a Antiguo</option>
+                </select>
+              </div>
+            </div>
+          </div>
         </div>
-      </div>
 
-      <!-- Mostrar productos -->
-      <div id="product-list" class="mt-12">
-        <h2 class="text-2xl font-semibold text-center">Vinilos Disponibles</h2>
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-          {products.map(product => (
-            <a href={`/product/${product.id}`} class="bg-white p-6 rounded-lg shadow-lg product-card">
-              <img src={product.imageUrl} alt={product.name} class="w-full h-48 object-cover rounded-md" />
-              <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
-              <p class="mt-2 text-gray-600">{product.description}</p>
-              <p class="mt-2 text-gray-800 font-bold">Precio: ${typeof product.price === 'number' ? product.price.toLocaleString('es-ES') : 'N/A'}</p>
-            </a>
-          ))}
+        <!-- Mostrar productos -->
+        <div id="product-list" class="mt-12">
+          <h2 class="text-2xl font-semibold text-center">Vinilos Disponibles</h2>
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+            {products.map(product => (
+              <a
+                href={`/product/${product.id}`}
+                class="bg-white p-6 rounded-lg shadow-lg product-card hover:shadow-xl transition-shadow duration-200"
+                data-genres={product.genres.join(',')}
+                data-created-at={product.createdAt?.toDate().toISOString()}
+                data-price={product.price ?? ''}
+                data-artist={product.artistName.toLowerCase()}
+              >
+                <img src={product.imageUrl} alt={product.name} class="w-full h-48 object-cover rounded-md" />
+                <!-- Mostrar "RESERVA" si es preventa activa -->
+                {product.isPreOrder && product.releaseDate && (() => {
+                  const currentDate = new Date();
+                  const releaseDate = product.releaseDate.toDate();
+                  if (releaseDate > currentDate) {
+                    return (
+                      <div class="mt-2">
+                        <span class="bg-yellow-400 text-black px-2 py-1 rounded">RESERVA</span>
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
+                <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
+                <p class="mt-2 text-gray-600">Artista: {product.artistName}</p>
+                <p class="mt-2 text-gray-800 font-bold">
+                  Precio: ${typeof product.price === 'number' ? product.price.toLocaleString('es-ES') : 'N/A'}
+                </p>
+              </a>
+            ))}
+          </div>
         </div>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- Script para manejar la búsqueda -->
-<script>
-  const searchBar = document.getElementById('search-bar');
-  
-  searchBar.addEventListener('input', function(event) {
-    const input = event.target as HTMLInputElement; // Cast explícito a HTMLInputElement
-    const searchTerm = input.value.toLowerCase();
-    const productCards = document.querySelectorAll('.product-card') as NodeListOf<HTMLElement>; // Cast a HTMLElement
+  <!-- Script para manejar la búsqueda y filtros -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const searchBar = document.getElementById('search-bar');
+      const genreCheckboxes = document.querySelectorAll('input[name="genre"]');
+      const sortOrder = document.getElementById('sort-order');
+      const minPriceInput = document.getElementById('min-price');
+      const maxPriceInput = document.getElementById('max-price');
+      const productGrid = document.querySelector('#product-list .grid');
+      const toggleGenresBtn = document.getElementById('toggle-genres');
+      const genreList = document.getElementById('genre-list');
+      const toggleGenresIcon = document.getElementById('toggle-genres-icon');
+      const toggleGenresText = document.getElementById('toggle-genres-text');
 
-    productCards.forEach(card => {
-      const productName = card.querySelector('h3')?.textContent?.toLowerCase() || '';
-      if (productName.includes(searchTerm)) {
-        card.style.display = 'block'; // Mostrar la tarjeta
-      } else {
-        card.style.display = 'none'; // Ocultar la tarjeta
+      // Guardar todos los productos en una variable
+      const allProducts = Array.from(document.querySelectorAll('.product-card'));
+
+      // Función para filtrar y ordenar los productos
+      const filterAndSortProducts = () => {
+        if (!allProducts.length) return;
+
+// Obtener los valores de los filtros
+const searchTerm = searchBar instanceof HTMLInputElement && searchBar.value
+  ? searchBar.value.toLowerCase()
+  : '';
+
+// Asegurarnos de que los elementos de checkbox son del tipo HTMLInputElement
+const selectedGenres = Array.from(genreCheckboxes)
+  .filter((checkbox): checkbox is HTMLInputElement => checkbox instanceof HTMLInputElement && checkbox.checked)
+  .map(checkbox => checkbox.value);
+
+// Asegurarnos de que minPriceInput y maxPriceInput son HTMLInputElement
+let minPriceValue = minPriceInput instanceof HTMLInputElement && minPriceInput.value
+  ? parseFloat(minPriceInput.value)
+  : 0;
+
+let maxPriceValue = maxPriceInput instanceof HTMLInputElement && maxPriceInput.value
+  ? parseFloat(maxPriceInput.value)
+  : Infinity;
+
+const sortValue = sortOrder instanceof HTMLSelectElement && sortOrder.value ? sortOrder.value : '';
+
+// Validar que minPrice <= maxPrice
+if (minPriceValue > maxPriceValue) {
+  // Intercambiar los valores si minPrice es mayor que maxPrice
+  [minPriceValue, maxPriceValue] = [maxPriceValue, minPriceValue];
+  if (minPriceInput instanceof HTMLInputElement && maxPriceInput instanceof HTMLInputElement) {
+    minPriceInput.value = minPriceValue.toString();
+    maxPriceInput.value = maxPriceValue.toString();
+  }
+}
+
+        // Filtrar los productos
+        let filteredProducts = allProducts.filter(card => {
+          const productNameElem = card.querySelector('h3');
+          const productName = productNameElem && productNameElem.textContent ? productNameElem.textContent.toLowerCase() : '';
+          const artistName = card.getAttribute('data-artist') || '';
+          const price = parseFloat(card.getAttribute('data-price') || '0');
+          const genres = card.getAttribute('data-genres') ? card.getAttribute('data-genres').split(',') : [];
+
+          // Búsqueda por nombre o artista
+          const matchesSearch = productName.includes(searchTerm) || artistName.includes(searchTerm);
+
+          // Filtro por géneros
+          const matchesGenre = selectedGenres.length === 0 || selectedGenres.some(genre => genres.includes(genre));
+
+          // Filtro por rango de precio
+          const matchesPrice = price >= minPriceValue && price <= maxPriceValue;
+
+          return matchesSearch && matchesGenre && matchesPrice;
+        });
+
+        // Ordenamiento
+        switch (sortValue) {
+          case 'price-asc':
+            filteredProducts.sort((a, b) => {
+              const priceA = parseFloat(a.getAttribute('data-price') || '0');
+              const priceB = parseFloat(b.getAttribute('data-price') || '0');
+              return priceA - priceB;
+            });
+            break;
+          case 'price-desc':
+            filteredProducts.sort((a, b) => {
+              const priceA = parseFloat(a.getAttribute('data-price') || '0');
+              const priceB = parseFloat(b.getAttribute('data-price') || '0');
+              return priceB - priceA;
+            });
+            break;
+          case 'date-asc':
+            filteredProducts.sort((a, b) => {
+              const dateA = new Date(a.getAttribute('data-created-at') || '').getTime();
+              const dateB = new Date(b.getAttribute('data-created-at') || '').getTime();
+              return dateA - dateB;
+            });
+            break;
+          case 'date-desc':
+            filteredProducts.sort((a, b) => {
+              const dateA = new Date(a.getAttribute('data-created-at') || '').getTime();
+              const dateB = new Date(b.getAttribute('data-created-at') || '').getTime();
+              return dateB - dateA;
+            });
+            break;
+          default:
+            // No ordenar
+            break;
+        }
+
+        // Limpiar la lista de productos
+        if (productGrid) {
+          productGrid.innerHTML = '';
+        }
+
+        // Agregar los productos filtrados y ordenados
+        filteredProducts.forEach(card => {
+          if (productGrid) {
+            productGrid.appendChild(card);
+          }
+        });
+      };
+
+      // Agregar eventos a los filtros
+      if (searchBar) {
+        searchBar.addEventListener('input', filterAndSortProducts);
+      }
+
+      genreCheckboxes.forEach(checkbox => {
+        checkbox.addEventListener('change', filterAndSortProducts);
+      });
+
+      if (sortOrder) {
+        sortOrder.addEventListener('change', filterAndSortProducts);
+      }
+
+      if (minPriceInput) {
+        minPriceInput.addEventListener('input', filterAndSortProducts);
+      }
+
+      if (maxPriceInput) {
+        maxPriceInput.addEventListener('input', filterAndSortProducts);
+      }
+
+      // Agregar funcionalidad al botón de mostrar/ocultar géneros
+      if (toggleGenresBtn && genreList && toggleGenresIcon && toggleGenresText) {
+        let isExpanded = false;
+        toggleGenresBtn.addEventListener('click', () => {
+          if (isExpanded) {
+            genreList.classList.add('hidden');
+            toggleGenresText.textContent = 'Mostrar géneros';
+            toggleGenresIcon.innerHTML = `
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+            `;
+            isExpanded = false;
+          } else {
+            genreList.classList.remove('hidden');
+            toggleGenresText.textContent = 'Ocultar géneros';
+            toggleGenresIcon.innerHTML = `
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 15l7-7 7 7" />
+            `;
+            isExpanded = true;
+          }
+        });
       }
     });
-  });
-</script>
+  </script>
+</body>
+</html>

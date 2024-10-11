@@ -1,6 +1,61 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
+
+// Lista de géneros musicales
+const genres = [
+  "Rock",
+  "Rock Latino",
+  "Rock Clásico",
+  "Blues Rock",
+  "Hard Rock",
+  "Rock Progresivo",
+  "Punk / Post Punk",
+  "Rock 90s",
+  "Grunge",
+  "Metal",
+  "Pop",
+  "Indie Rock",
+  "Indie Pop",
+  "Brit Pop",
+  "Jazz",
+  "Fusión",
+  "Bop",
+  "Modal",
+  "Blues",
+  "Folk",
+  "Organic Grooves",
+  "Funk / Soul",
+  "Afrobeat",
+  "Disco / Italo / Boogie",
+  "Reggae / Dub",
+  "MPB",
+  "Latinoamericana",
+  "World",
+  "Hip Hop",
+  "Música Local",
+  "Electrónica",
+  "Experimental",
+  "Cumbia",
+  "Clásica",
+  "Contemporánea",
+  "Soundtrack",
+  "Acid",
+  "Ambient / Downtempo / TripHop",
+  "Drone / Experimental / Noise",
+  "House / Deep House",
+  "IDM",
+  "Krautrock",
+  "Minimal",
+  "Techno / Electro / Breakbeat",
+  "New Wave / Synth Pop",
+  "Dark Wave / EBM / Industrial",
+  "No Wave",
+  "Reguetón",
+  "Trap",
+  // Agrega más géneros si lo deseas
+];
 ---
+
 <BaseLayout>
   <section class="container mx-auto px-6 py-12">
     <h2 class="text-3xl font-bold mb-6">Agregar Nuevo Producto</h2>
@@ -20,10 +75,49 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
         <label for="albumName" class="block text-sm font-medium text-gray-700">Nombre del Álbum</label>
         <input type="text" id="albumName" name="albumName" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
       </div>
+
+      <!-- Nuevo campo: Género musical -->
       <div>
-        <label for="description" class="block text-sm font-medium text-gray-700">Descripción</label>
-        <textarea id="description" name="description" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows="4" required></textarea>
+        <label for="genres" class="block text-sm font-medium text-gray-700">Género Musical</label>
+        <select id="genres" name="genres" multiple class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required>
+          {genres.map(genre => (
+            <option value={genre}>{genre}</option>
+          ))}
+        </select>
+        <p class="text-sm text-gray-500">Mantén presionada la tecla Ctrl (Windows) o Command (Mac) para seleccionar múltiples géneros.</p>
       </div>
+
+      <!-- Nuevo campo: ¿Es una preventa? -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">¿Es una preventa?</label>
+        <div class="mt-1 flex items-center">
+          <label class="mr-4">
+            <input type="radio" name="isPreOrder" value="yes" class="mr-1"> Sí
+          </label>
+          <label>
+            <input type="radio" name="isPreOrder" value="no" class="mr-1" checked> No
+          </label>
+        </div>
+      </div>
+
+      <!-- Campo condicional: Fecha de salida -->
+      <div id="releaseDateContainer" style="display: none;">
+        <label for="releaseDate" class="block text-sm font-medium text-gray-700">Fecha de Salida</label>
+        <input type="date" id="releaseDate" name="releaseDate" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" />
+      </div>
+
+      <!-- Cambiar "Descripción" por "Tracklist" -->
+      <div>
+        <label for="tracklist" class="block text-sm font-medium text-gray-700">Tracklist</label>
+        <textarea id="tracklist" name="tracklist" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows="4" required></textarea>
+      </div>
+
+      <!-- Nuevo campo: Información adicional -->
+      <div>
+        <label for="additionalInfo" class="block text-sm font-medium text-gray-700">Información Adicional</label>
+        <textarea id="additionalInfo" name="additionalInfo" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows="4"></textarea>
+      </div>
+
       <div>
         <label for="imageUrl" class="block text-sm font-medium text-gray-700">URL de Imagen</label>
         <input type="url" id="imageUrl" name="imageUrl" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
@@ -37,6 +131,22 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
       const form = document.getElementById('addNewProductForm');
       const errorContainer = document.getElementById('error-container');
       const successContainer = document.getElementById('success-container');
+      const isPreOrderRadios = document.getElementsByName('isPreOrder') as NodeListOf<HTMLInputElement>;
+      const releaseDateContainer = document.getElementById('releaseDateContainer');
+      const releaseDateInput = document.getElementById('releaseDate') as HTMLInputElement | null;
+
+      // Mostrar u ocultar el campo de fecha de salida según la selección
+      isPreOrderRadios.forEach(radio => {
+        radio.addEventListener('change', () => {
+          if (radio.value === 'yes' && radio.checked) {
+            if (releaseDateContainer) releaseDateContainer.style.display = 'block';
+            if (releaseDateInput) releaseDateInput.required = true;
+          } else {
+            if (releaseDateContainer) releaseDateContainer.style.display = 'none';
+            if (releaseDateInput) releaseDateInput.required = false;
+          }
+        });
+      });
 
       if (form) {
         form.addEventListener('submit', async (event) => {
@@ -50,38 +160,67 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
           const nameElement = document.getElementById('name');
           const artistNameElement = document.getElementById('artistName');
           const albumNameElement = document.getElementById('albumName');
-          const descriptionElement = document.getElementById('description');
+          const genresElement = document.getElementById('genres');
+          const tracklistElement = document.getElementById('tracklist');
+          const additionalInfoElement = document.getElementById('additionalInfo');
           const imageUrlElement = document.getElementById('imageUrl');
+
+          const isPreOrderElement = document.querySelector('input[name="isPreOrder"]:checked') as HTMLInputElement | null;
+          const isPreOrder = isPreOrderElement?.value === 'yes';
+
+          const releaseDateValue = releaseDateInput ? releaseDateInput.value : '';
+
+          if (isPreOrder && !releaseDateValue) {
+            if (errorContainer) errorContainer.textContent = 'Por favor, ingresa la fecha de salida para la preventa.';
+            return;
+          }
 
           // Verificar que los elementos existen y son del tipo correcto
           if (
             nameElement instanceof HTMLInputElement &&
             artistNameElement instanceof HTMLInputElement &&
             albumNameElement instanceof HTMLInputElement &&
-            descriptionElement instanceof HTMLTextAreaElement &&
+            genresElement instanceof HTMLSelectElement &&
+            tracklistElement instanceof HTMLTextAreaElement &&
+            additionalInfoElement instanceof HTMLTextAreaElement &&
             imageUrlElement instanceof HTMLInputElement
           ) {
             const name = nameElement.value.trim();
             const artistName = artistNameElement.value.trim();
             const albumName = albumNameElement.value.trim();
-            const description = descriptionElement.value.trim();
+            const genres = Array.from(genresElement.selectedOptions).map(option => option.value);
+            const tracklist = tracklistElement.value.trim();
+            const additionalInfo = additionalInfoElement.value.trim();
             const imageUrl = imageUrlElement.value.trim();
 
             // Depuración: Mostrar los valores obtenidos
-            console.log('Formulario de agregar producto enviado:', { name, artistName, albumName, description, imageUrl });
+            console.log('Formulario de agregar producto enviado:', { name, artistName, albumName, genres, tracklist, additionalInfo, imageUrl, isPreOrder, releaseDateValue });
 
             // Validación básica
-            if (!name || !artistName || !albumName || !description || !imageUrl) {
-              errorContainer.textContent = 'Por favor, completa todos los campos correctamente.';
+            if (!name || !artistName || !albumName || genres.length === 0 || !tracklist || !imageUrl) {
+              if (errorContainer) errorContainer.textContent = 'Por favor, completa todos los campos obligatorios correctamente.';
               return;
             }
+
+            // Construir el objeto de datos para enviar al servidor
+            const formData = {
+              name,
+              artistName,
+              albumName,
+              genres,
+              tracklist,
+              additionalInfo,
+              imageUrl,
+              isPreOrder,
+              releaseDate: isPreOrder ? releaseDateValue : null,
+            };
 
             try {
               // Enviar la solicitud al servidor
               const response = await fetch('/api/seller/add-new-product', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name, artistName, albumName, description, imageUrl }),
+                body: JSON.stringify(formData),
               });
 
               // Depuración: Mostrar el estado de la respuesta
@@ -108,8 +247,16 @@ import BaseLayout from "../../layouts/BaseLayout.astro";
                 nameElement.value = '';
                 artistNameElement.value = '';
                 albumNameElement.value = '';
-                descriptionElement.value = '';
+                genresElement.selectedIndex = -1;
+                tracklistElement.value = '';
+                additionalInfoElement.value = '';
                 imageUrlElement.value = '';
+                if (releaseDateInput) releaseDateInput.value = '';
+                if (releaseDateContainer) releaseDateContainer.style.display = 'none';
+                if (releaseDateInput) releaseDateInput.required = false;
+                // Restablecer el campo de preventa a "No"
+                const isPreOrderNoElement = document.querySelector('input[name="isPreOrder"][value="no"]') as HTMLInputElement | null;
+                if (isPreOrderNoElement) isPreOrderNoElement.checked = true;
               } else {
                 if (errorContainer) errorContainer.textContent = result.message || 'Error al agregar el producto.';
               }

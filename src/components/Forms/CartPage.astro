@@ -1,7 +1,8 @@
 ---
-import { adminAuth, adminFirestore } from '../../firebase/server'; // Ajusta según tu estructura
-import { getSellerInfo } from '../../firebase/server'; // Reutiliza la función existente
-import { format } from 'date-fns'; // Librería para formatear fechas, instala si no la tienes
+import { adminAuth, adminFirestore } from '../../firebase/server';
+import { getSellerInfo } from '../../firebase/server';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const sessionCookie = Astro.cookies.get('session')?.value;
 
@@ -38,6 +39,17 @@ try {
 } catch (error) {
   console.error('Error al obtener el producto o la información del vendedor:', error);
 }
+
+// Verificar si es preventa y si la fecha de salida aún no ha pasado
+let isPreOrderActive = false;
+let formattedReleaseDate = null;
+
+if (product && product.isPreOrder && product.releaseDate) {
+  const currentDate = new Date();
+  const releaseDate = product.releaseDate.toDate(); // Convertir Timestamp a Date
+  isPreOrderActive = releaseDate > currentDate;
+  formattedReleaseDate = format(releaseDate, "dd 'de' MMMM 'de' yyyy", { locale: es });
+}
 ---
 <section class="p-6 flex justify-center items-center bg-gray-100 min-h-screen">
   <div class="bg-white p-8 rounded-lg shadow-lg w-full max-w-3xl">
@@ -46,7 +58,11 @@ try {
     <!-- Mensaje Informativo -->
     <div class="bg-yellow-100 border-l-4 border-yellow-500 text-yellow-700 p-4 mb-6" role="alert">
       <p class="font-bold">Importante</p>
-      <p>Al confirmar tu compra, debes acercarte a la tienda a recoger tu pedido con el número de orden.</p>
+      {isPreOrderActive ? (
+        <p>Este es un producto en reserva. Al confirmar tu compra, podrás retirarlo a partir del {formattedReleaseDate} presentando tu número de orden.</p>
+      ) : (
+        <p>Al confirmar tu compra, debes acercarte a la tienda a recoger tu pedido con el número de orden.</p>
+      )}
     </div>
 
     {product ? (
@@ -58,6 +74,12 @@ try {
 
         <!-- Información del Producto y Vendedor -->
         <div class="lg:w-2/3 lg:pl-6 mt-4 lg:mt-0">
+          <!-- Mostrar "RESERVA" si es preventa activa -->
+          {isPreOrderActive && (
+            <div class="mb-2">
+              <span class="bg-yellow-400 text-black px-2 py-1 rounded">RESERVA</span>
+            </div>
+          )}
           <p class="text-xl font-semibold">{product.name}</p>
           <p class="text-gray-600 mt-2"><strong>Tienda:</strong> {sellerInfo?.seller?.storeName || storeName || 'No disponible'}</p>
           <p class="text-gray-600"><strong>Precio:</strong> ${price.toFixed(2)}</p>
@@ -84,7 +106,7 @@ try {
                 <p class="text-gray-700"><strong>Desde:</strong> {sellerInfo.seller.horarioAtencion?.desde || 'No disponible'}</p>
                 <p class="text-gray-700"><strong>Hasta:</strong> {sellerInfo.seller.horarioAtencion?.hasta || 'No disponible'}</p>
               </div>
-              <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {sellerInfo.seller.updatedAt ? format(sellerInfo.seller.updatedAt, 'dd de MMMM yyyy, h:mm:ss a') : 'No disponible'}</p>
+              <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {sellerInfo.seller.updatedAt ? format(sellerInfo.seller.updatedAt, 'dd de MMMM yyyy, h:mm:ss a', { locale: es }) : 'No disponible'}</p>
             </div>
           ) : (
             <p class="text-red-600 mt-4">Información del vendedor no disponible.</p>

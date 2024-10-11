@@ -119,9 +119,6 @@ expressApp.listen(PORT, () => {
   console.log(`Servidor escuchando en http://localhost:${PORT}`);
 });
 
-// Funciones auxiliares
-
-// Obtener todos los productos disponibles en la colección 'products'
 export async function getProducts() {
   try {
     // Obtener los 9 productos más recientes de la colección 'products'
@@ -130,19 +127,29 @@ export async function getProducts() {
       .limit(9)
       .get();
 
-    const products = productsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      name: doc.data().name ?? 'Sin nombre',
-      artistName: doc.data().artistName ?? 'Artista desconocido',
-      description: doc.data().description ?? 'Sin descripción',
-      imageUrl: doc.data().imageUrl ?? '/default-image.png',
-      createdAt: doc.data().createdAt,
-    }));
+    const products = productsSnapshot.docs.map(doc => {
+      const data = doc.data();
+
+      return {
+        id: doc.id,
+        name: data.name ?? 'Sin nombre',
+        artistName: data.artistName ?? 'Artista desconocido',
+        albumName: data.albumName ?? 'Álbum desconocido',
+        description: data.description ?? '',
+        additionalInfo: data.additionalInfo ?? '',
+        tracklist: data.tracklist ?? '',
+        genres: data.genres ?? [], // Asegúrate de que este campo existe y es un array
+        imageUrl: data.imageUrl ?? '/default-image.png',
+        isPreOrder: data.isPreOrder ?? false,
+        releaseDate: data.releaseDate ?? null,
+        createdAt: data.createdAt,
+      };
+    });
 
     // Obtener los precios de todos los productos de las subcolecciones 'sellers/products'
     const sellersProductsSnapshot = await adminFirestore.collectionGroup('products').get();
 
-    const priceMap = {};
+    const priceMap: { [key: string]: number } = {};
 
     sellersProductsSnapshot.docs.forEach(doc => {
       const data = doc.data();
@@ -164,7 +171,7 @@ export async function getProducts() {
     // Añadir el precio más bajo a cada producto
     const productsWithPrices = products.map(product => ({
       ...product,
-      price: priceMap[product.id] !== undefined ? priceMap[product.id] : 'N/A',
+      price: priceMap[product.id] !== undefined ? priceMap[product.id] : null, // Cambiado de 'N/A' a null
     }));
 
     return productsWithPrices;
@@ -183,14 +190,24 @@ export async function getAllProducts() {
       .orderBy('createdAt', 'desc')
       .get();
 
-    const products = productsSnapshot.docs.map(doc => ({
-      id: doc.id,
-      name: doc.data().name ?? 'Sin nombre',
-      artistName: doc.data().artistName ?? 'Artista desconocido',
-      description: doc.data().description ?? 'Sin descripción',
-      imageUrl: doc.data().imageUrl ?? '/default-image.png',
-      createdAt: doc.data().createdAt,
-    }));
+    const products = productsSnapshot.docs.map(doc => {
+      const data = doc.data();
+
+      return {
+        id: doc.id,
+        name: data.name ?? 'Sin nombre',
+        artistName: data.artistName ?? 'Artista desconocido',
+        albumName: data.albumName ?? 'Álbum desconocido',
+        description: data.description ?? '',
+        additionalInfo: data.additionalInfo ?? '',
+        tracklist: data.tracklist ?? '',
+        genres: data.genres ?? [],
+        imageUrl: data.imageUrl ?? '/default-image.png',
+        isPreOrder: data.isPreOrder ?? false,
+        releaseDate: data.releaseDate ?? null,
+        createdAt: data.createdAt,
+      };
+    });
 
     // Obtener los precios de todos los productos de la subcolección 'sellers/products'
     const sellersProductsSnapshot = await adminFirestore.collectionGroup('products').get();
@@ -202,17 +219,22 @@ export async function getAllProducts() {
       const productId = data.productId;
       const price = data.price;
 
-      if (priceMap[productId] != null) {
-        priceMap[productId] = Math.min(priceMap[productId], price);
+      if (productId && typeof price === 'number') {
+        if (priceMap[productId] != null) {
+          priceMap[productId] = Math.min(priceMap[productId], price);
+        } else {
+          priceMap[productId] = price;
+        }
       } else {
-        priceMap[productId] = price;
+        // Remueve o comenta el console.warn para evitar llenar los registros con errores conocidos
+        // console.warn(`Datos inválidos en el producto del vendedor: doc.id=${doc.id}, productId=${productId}, price=${price}`);
       }
     });
 
     // Añadir el precio más bajo a cada producto
     const productsWithPrices = products.map(product => ({
       ...product,
-      price: priceMap[product.id] !== undefined ? priceMap[product.id] : 'N/A',
+      price: priceMap[product.id] !== undefined ? priceMap[product.id] : null,
     }));
 
     return productsWithPrices;
@@ -222,7 +244,6 @@ export async function getAllProducts() {
     throw new Error('Error al obtener todos los productos');
   }
 }
-
 
 // Guardar información del producto para un vendedor en la subcolección 'products'
 export async function saveSellerProductInfo(
@@ -253,7 +274,8 @@ export async function saveSellerProductInfo(
   }
 }
 
-export async function getSellerProductInfo(productId) {
+// Obtener información de los vendedores que ofrecen un producto específico
+export async function getSellerProductInfo(productId: string) {
   try {
     // Obtener todos los vendedores
     const sellersSnapshot = await adminFirestore.collection('sellers').get();
@@ -263,7 +285,7 @@ export async function getSellerProductInfo(productId) {
     for (const sellerDoc of sellersSnapshot.docs) {
       const sellerId = sellerDoc.id;
       const sellerData = sellerDoc.data();
-      const sellerName = sellerData.name || 'Vendedor Anónimo';
+      const sellerName = sellerData.storeName || 'Vendedor Anónimo';
 
       // Verificar si el vendedor tiene el producto
       const productDoc = await adminFirestore
@@ -275,11 +297,13 @@ export async function getSellerProductInfo(productId) {
 
       if (productDoc.exists) {
         const productData = productDoc.data();
+
         sellers.push({
           sellerId,
           sellerName,
-          price: productData.price,
-          stock: productData.stock,
+          price: productData.price ?? 0,
+          stock: productData.stock ?? 0,
+          // Agrega otros campos si es necesario
         });
       }
     }
@@ -290,6 +314,7 @@ export async function getSellerProductInfo(productId) {
     return [];
   }
 }
+
 
 // Obtener información de un vendedor específico junto con los productos que vende
 export async function getSellerInfo(sellerId: string) {
@@ -358,6 +383,38 @@ export async function getSellerInfo(sellerId: string) {
   } catch (error) {
     console.error('Error obteniendo la información del vendedor:', error);
     throw new Error('Error al obtener la información del vendedor');
+  }
+}
+
+// Obtener un producto específico por su ID
+export async function getProductById(productId: string) {
+  try {
+    const productRef = adminFirestore.collection('products').doc(productId);
+    const productSnapshot = await productRef.get();
+
+    if (!productSnapshot.exists) {
+      return null;
+    }
+
+    const productData = productSnapshot.data();
+
+    return {
+      id: productId,
+      name: productData?.name ?? 'Nombre no disponible',
+      artistName: productData?.artistName ?? 'Artista no disponible',
+      albumName: productData?.albumName ?? 'Álbum no disponible',
+      genres: productData?.genres ?? [],
+      tracklist: productData?.tracklist ?? 'Tracklist no disponible',
+      additionalInfo: productData?.additionalInfo ?? '',
+      imageUrl: productData?.imageUrl ?? '/default-image.png',
+      description: productData?.description ?? '',
+      isPreOrder: productData?.isPreOrder ?? false,
+      releaseDate: productData?.releaseDate ?? null,
+      // Agrega otros campos si es necesario
+    };
+  } catch (error) {
+    console.error('Error al obtener el producto:', error);
+    throw new Error('Error al obtener el producto');
   }
 }
 

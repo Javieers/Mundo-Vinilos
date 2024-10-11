@@ -1,10 +1,13 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getAllProducts, getSellerProductInfo } from '../../firebase/server';
+import { getProductById, getSellerProductInfo } from '../../firebase/server';
+import { format } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 const { id } = Astro.params;
-const products = await getAllProducts();
-const product = products.find(p => p.id === id);
+
+// Obtener el producto específico por su ID
+const product = await getProductById(id);
 
 if (!product) {
   throw new Error('Producto no encontrado');
@@ -12,33 +15,80 @@ if (!product) {
 
 // Obtener información de los vendedores que ofrecen este producto
 const sellers = await getSellerProductInfo(id);
----
 
+// Verificar si es preventa y si la fecha de salida aún no ha pasado
+let isPreOrderActive = false;
+if (product.isPreOrder && product.releaseDate) {
+  const currentDate = new Date();
+  const releaseDate = product.releaseDate.toDate(); // Convertir Timestamp a Date
+  isPreOrderActive = releaseDate > currentDate;
+  var formattedReleaseDate = format(releaseDate, "dd 'de' MMMM 'de' yyyy", { locale: es });
+}
+---
 <BaseLayout>
   <section>
-    <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
-      <div class="bg-white p-6 rounded-lg shadow-lg">
-        <img src={product.imageUrl} alt={product.name} class="w-full h-auto max-h-96 object-contain rounded-md" />
-        <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
-        <p class="mt-2 text-gray-600">{product.description}</p>
+    <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 px-8 py-24">
+      <!-- Contenedor principal del producto -->
+      <div class="bg-white p-6 rounded-lg shadow-lg flex flex-col md:flex-row">
+        <!-- Imagen del Producto -->
+        <div class="md:w-1/2 flex-shrink-0">
+          <img src={product.imageUrl} alt={product.name} class="w-full h-auto object-contain rounded-md" />
+        </div>
+
+        <!-- Información del Producto -->
+        <div class="md:w-1/2 md:pl-6 mt-6 md:mt-0">
+          <!-- Mostrar "RESERVA" si es preventa activa -->
+          {isPreOrderActive && (
+            <div class="mb-2">
+              <span class="bg-yellow-400 text-black px-2 py-1 rounded">RESERVA</span>
+            </div>
+          )}
+          <h1 class="text-3xl font-bold">{product.name}</h1>
+          <p class="text-gray-700 mt-2"><strong>Artista:</strong> {product.artistName}</p>
+          <p class="text-gray-700"><strong>Álbum:</strong> {product.albumName}</p>
+          {product.genres && product.genres.length > 0 && (
+            <p class="text-gray-700"><strong>Géneros:</strong> {product.genres.join(', ')}</p>
+          )}
+          {product.additionalInfo && (
+            <div class="mt-4">
+              <h2 class="text-xl font-semibold">Información Adicional:</h2>
+              <p class="text-gray-700">{product.additionalInfo}</p>
+            </div>
+          )}
+          {product.tracklist && (
+            <div class="mt-4">
+              <h2 class="text-xl font-semibold">Tracklist:</h2>
+              <p class="text-gray-700 whitespace-pre-line">{product.tracklist}</p>
+            </div>
+          )}
+
+          <!-- Mensaje de reserva si es preventa activa -->
+          {isPreOrderActive && (
+            <div class="mt-4">
+              <p class="text-red-600 font-semibold">Este producto estará disponible a partir del {formattedReleaseDate}. Puedes reservarlo ahora.</p>
+            </div>
+          )}
+        </div>
       </div>
 
+      <!-- Precios por Vendedor -->
       <div class="mt-12">
-        <h3 class="text-2xl font-semibold">Precios por vendedor</h3>
+        <h2 class="text-2xl font-semibold">Precios por Vendedor</h2>
         <ul class="mt-4">
           {sellers.length > 0 ? (
             sellers.map(seller => (
-              <li class="border-b py-4" id={`seller-${seller.sellerId}`}>
-                <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
-                - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
-                
+              <li class="border-b py-4 flex items-center justify-between" id={`seller-${seller.sellerId}`}>
+                <div>
+                  <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
+                  - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
+                </div>
                 {/* Enlace para comprar que lleva a CartPage con parámetros */}
                 {seller.stock > 0 && (
                   <a 
-                    class="ml-4 bg-blue-600 text-white px-3 py-1 rounded"
+                    class="bg-blue-600 text-white px-3 py-1 rounded"
                     href={`/cartpage?productId=${product.id}&sellerId=${seller.sellerId}&sellerName=${encodeURIComponent(seller.sellerName)}&price=${seller.price}`}
                   >
-                    Comprar
+                    {isPreOrderActive ? 'Reservar' : 'Comprar'}
                   </a>
                 )}
               </li>
