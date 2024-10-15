@@ -3,6 +3,43 @@
 import type { APIRoute } from 'astro';
 import { adminAuth, adminFirestore } from '../../firebase/server';
 import admin from 'firebase-admin';
+import bcrypt from 'bcrypt'; // Asegúrate de tener bcrypt instalado
+
+// Función para generar un Order ID de 5 caracteres
+function generateOrderId(length: number = 5): string {
+  const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+  let result = '';
+  for(let i = 0; i < length; i++) {
+    result += characters.charAt(Math.floor(Math.random() * characters.length));
+  }
+  return result;
+}
+
+// Función para generar un PIN de 4 dígitos
+function generatePIN(length: number = 4): string {
+  let pin = '';
+  for(let i = 0; i < length; i++) {
+    pin += Math.floor(Math.random() * 10).toString();
+  }
+  return pin;
+}
+
+// Función para asegurar la unicidad del Order ID
+async function generateUniqueOrderId(length: number = 5): Promise<string> {
+  let unique = false;
+  let orderId = '';
+  
+  while (!unique) {
+    orderId = generateOrderId(length);
+    const q = adminFirestore.collection('orders').where('orderId', '==', orderId);
+    const snapshot = await q.get();
+    if (snapshot.empty) {
+      unique = true;
+    }
+  }
+  
+  return orderId;
+}
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const sessionCookie = cookies.get('session')?.value;
@@ -28,11 +65,27 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const userId = decodedClaims.uid;
 
     // Obtener los datos de la solicitud
-    const { productId, sellerId, price, quantity } = await request.json();
+    const { productId, sellerId, price, quantity, estadoVinilo, estadoCaratula } = await request.json();
 
     // Validar los datos recibidos
-    if (!productId || !sellerId || typeof price !== 'number' || typeof quantity !== 'number') {
+    if (
+      !productId ||
+      !sellerId ||
+      typeof price !== 'number' ||
+      typeof quantity !== 'number' ||
+      !estadoVinilo ||
+      !estadoCaratula
+    ) {
       return new Response(JSON.stringify({ message: 'Datos de compra inválidos' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validar valores de estadoVinilo y estadoCaratula
+    const estadosValidos = ['Nuevo', 'Usado'];
+    if (!estadosValidos.includes(estadoVinilo) || !estadosValidos.includes(estadoCaratula)) {
+      return new Response(JSON.stringify({ message: 'Los valores de estado del vinilo y carátula son inválidos.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -48,8 +101,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const userPurchasesRef = adminFirestore.collection('users').doc(userId).collection('purchases');
     const ordersRef = adminFirestore.collection('orders');
 
-    // Generar un número de orden único
-    const orderId = ordersRef.doc().id;
+    // Generar un Order ID único de 5 caracteres
+    const orderId = await generateUniqueOrderId();
+
+    // Generar un PIN de 4 dígitos
+    const pin = generatePIN();
+
+    // Opcional: Hash del PIN para mayor seguridad
+    // const hashedPin = await bcrypt.hash(pin, 10);
 
     // Ejecutar la compra en una transacción para asegurar la consistencia
     await adminFirestore.runTransaction(async (transaction) => {
@@ -93,6 +152,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
         isPreOrder,
         releaseDate,
         createdAt: admin.firestore.FieldValue.serverTimestamp(),
+        pin, // Almacenar el PIN en texto plano
+        estadoVinilo, // Nuevo campo
+        estadoCaratula, // Nuevo campo
+        // pin: hashedPin, // Si decides hashear el PIN
       };
 
       // Registrar la compra en la subcolección de compras del usuario
@@ -102,8 +165,11 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       transaction.set(ordersRef.doc(orderId), purchaseData);
     });
 
+    // Enviar el PIN al usuario de manera segura
+    // Por ejemplo, en la respuesta de la API, o por email
+    // Aquí, lo devolvemos en la respuesta
     return new Response(
-      JSON.stringify({ message: 'Compra realizada con éxito', orderId }),
+      JSON.stringify({ message: 'Compra realizada con éxito', orderId, pin }),
       {
         status: 200,
         headers: { 'Content-Type': 'application/json' },

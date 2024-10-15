@@ -98,6 +98,10 @@ if (order && order.isPreOrder && order.releaseDate) {
             <p class="text-gray-600"><strong>Número de Orden:</strong> {order.id}</p>
             <p class="text-gray-600"><strong>Estado:</strong> {order.status}</p>
 
+            <!-- Mostrar Estado del Vinilo y Estado de la Carátula -->
+            <p class="text-gray-600"><strong>Estado del Vinilo:</strong> {order.estadoVinilo || 'No especificado'}</p>
+            <p class="text-gray-600"><strong>Estado de la Carátula:</strong> {order.estadoCaratula || 'No especificado'}</p>
+
             <!-- Información Detallada del Vendedor -->
             {sellerInfo && sellerInfo.seller ? (
               <div class="mt-6 border-t pt-4">

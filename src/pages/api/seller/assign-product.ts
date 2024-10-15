@@ -20,11 +20,26 @@ export const POST: APIRoute = async ({ request, cookies }) => {
 
     // Obtener el cuerpo de la solicitud
     const data = await request.json();
-    const { productId, price, stock } = data;
+    const { productId, price, stock, estadoVinilo, estadoCaratula } = data;
 
     // Validar campos requeridos
-    if (!productId || typeof price !== 'number' || typeof stock !== 'number') {
+    if (
+      !productId ||
+      typeof price !== 'number' ||
+      typeof stock !== 'number' ||
+      !estadoVinilo ||
+      !estadoCaratula
+    ) {
       return new Response(JSON.stringify({ message: 'Todos los campos son requeridos y deben ser válidos.' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validar valores de estadoVinilo y estadoCaratula
+    const estadosValidos = ['Nuevo', 'Usado'];
+    if (!estadosValidos.includes(estadoVinilo) || !estadosValidos.includes(estadoCaratula)) {
+      return new Response(JSON.stringify({ message: 'Los valores de estado del vinilo y carátula son inválidos.' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -58,6 +73,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       imageUrl: string;
       price: number;
       stock: number;
+      estadoVinilo: string;
+      estadoCaratula: string;
       updatedAt: FirebaseFirestore.FieldValue;
       createdAt?: FirebaseFirestore.FieldValue; // Propiedad opcional
     }
@@ -65,12 +82,14 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     // Preparar los datos para guardar en la subcolección del vendedor
     const sellerProductData: SellerProductData = {
       productId: productId,
-      name: productData.name ?? '',
-      artistName: productData.artistName ?? '',
-      description: productData.description ?? '',
-      imageUrl: productData.imageUrl ?? '',
+      name: productData?.name ?? '',
+      artistName: productData?.artistName ?? '',
+      description: productData?.description ?? '',
+      imageUrl: productData?.imageUrl ?? '',
       price: price,
       stock: stock,
+      estadoVinilo: estadoVinilo,
+      estadoCaratula: estadoCaratula,
       updatedAt: admin.firestore.FieldValue.serverTimestamp(),
     };
 

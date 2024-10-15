@@ -303,6 +303,8 @@ export async function getSellerProductInfo(productId: string) {
           sellerName,
           price: productData.price ?? 0,
           stock: productData.stock ?? 0,
+          estadoVinilo: productData.estadoVinilo ?? 'No especificado',
+          estadoCaratula: productData.estadoCaratula ?? 'No especificado',
           // Agrega otros campos si es necesario
         });
       }
@@ -314,7 +316,6 @@ export async function getSellerProductInfo(productId: string) {
     return [];
   }
 }
-
 
 // Obtener información de un vendedor específico junto con los productos que vende
 export async function getSellerInfo(sellerId: string) {
@@ -346,6 +347,8 @@ export async function getSellerInfo(sellerId: string) {
             productId,
             price: sellerProductData.price,
             stock: sellerProductData.stock,
+            estadoVinilo: sellerProductData.estadoVinilo || 'No especificado',
+            estadoCaratula: sellerProductData.estadoCaratula || 'No especificado',
             name: 'Producto no disponible',
             description: 'Descripción no disponible',
             imageUrl: '/default-image.png',
@@ -356,6 +359,8 @@ export async function getSellerInfo(sellerId: string) {
           productId,
           price: sellerProductData.price,
           stock: sellerProductData.stock,
+          estadoVinilo: sellerProductData.estadoVinilo || 'No especificado',
+          estadoCaratula: sellerProductData.estadoCaratula || 'No especificado',
           name: productDoc.data()?.name ?? 'Nombre no disponible',
           description: productDoc.data()?.description ?? 'Descripción no disponible',
           imageUrl: productDoc.data()?.imageUrl ?? '/default-image.png',
@@ -375,7 +380,7 @@ export async function getSellerInfo(sellerId: string) {
         redesSociales: sellerData.redesSociales || '',
         horarioAtencion: sellerData.horarioAtencion || { desde: '', hasta: '' },
         sellerImage: sellerData.sellerImage || '',
-        updatedAt: sellerData.updatedAt ? (sellerData.updatedAt as Timestamp).toDate() : null,
+        updatedAt: sellerData.updatedAt ? (sellerData.updatedAt as FirebaseFirestore.Timestamp).toDate() : null,
         reviews: sellerData.reviews || [],
       },
       products,

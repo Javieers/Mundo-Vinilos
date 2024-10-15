@@ -14,7 +14,7 @@ if (!sessionCookie) {
 
 let userId: string;
 let userData: UserData = { email: '' };
-let purchases = [];
+let purchases: any[] = [];
 let errorOccurred = false;
 
 try {
@@ -92,22 +92,39 @@ try {
 
           <h2 class="text-2xl font-semibold mb-4">Mis Compras</h2>
           {purchases.length > 0 ? (
-            <ul class="space-y-4">
-              {purchases.map(purchase => (
-                <li class="border p-4 rounded-lg shadow-sm bg-gray-50 hover:bg-gray-100 transition duration-200">
-                  <a href={`/purchase-details/${purchase.id}`} class="flex items-center justify-between">
-                    <div>
-                      <p class="text-lg font-medium">Producto: {purchase.productName || 'No disponible'}</p>
-                      <p class="text-sm text-gray-600">Tienda: {purchase.storeName || 'No disponible'}</p>
-                    </div>
-                    <div class="text-right">
-                      <p class="text-lg font-semibold text-green-600">${purchase.total?.toFixed(2) || '0.00'}</p>
-                      <p class="text-sm text-gray-600">{purchase.createdAt ? purchase.createdAt.toLocaleString() : 'Fecha no disponible'}</p>
-                    </div>
-                  </a>
-                </li>
-              ))}
-            </ul>
+            <div class="overflow-x-auto">
+              <table class="min-w-full bg-white">
+                <thead>
+                  <tr>
+                    <th class="py-2 px-4 border-b">Order ID</th>
+                    <th class="py-2 px-4 border-b">Producto</th>
+                    <th class="py-2 px-4 border-b">Cantidad</th>
+                    <th class="py-2 px-4 border-b">Precio Total</th>
+                    <th class="py-2 px-4 border-b">PIN Secreto</th>
+                    <th class="py-2 px-4 border-b">Estado</th>
+                    <th class="py-2 px-4 border-b">Detalles</th> <!-- Nueva columna -->
+                  </tr>
+                </thead>
+                <tbody>
+                  {purchases.map(purchase => (
+                    <tr class="text-center">
+                      <td class="py-2 px-4 border-b">{purchase.orderId}</td>
+                      <td class="py-2 px-4 border-b">{purchase.productName || 'No disponible'}</td>
+                      <td class="py-2 px-4 border-b">{purchase.quantity}</td>
+                      <td class="py-2 px-4 border-b">${purchase.total?.toLocaleString('es-ES') || '0.00'}</td>
+                      <td class="py-2 px-4 border-b">
+                        <span id={`pin-${purchase.id}`} class="hidden">{purchase.pin}</span>
+                        <button onclick={`togglePIN(event, '${purchase.id}')`} class="text-blue-500 underline">Mostrar PIN</button>
+                      </td>
+                      <td class="py-2 px-4 border-b">{purchase.status}</td>
+                      <td class="py-2 px-4 border-b">
+                        <a href={`/purchase-details/${purchase.id}`} class="text-indigo-600 hover:text-indigo-900">Detalles del Pedido</a>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
           ) : (
             <p class="text-gray-700">No has realizado compras aún.</p>
           )}
@@ -119,5 +136,25 @@ try {
         </>
       )}
     </section>
+
+    <!-- Bloque de Script Corregido con is:inline -->
+    <script is:inline>
+      function togglePIN(event, orderId) {
+        const pinElement = document.getElementById(`pin-${orderId}`);
+        const button = event.target;
+
+        if (pinElement.classList.contains('hidden')) {
+          pinElement.classList.remove('hidden');
+          if (button instanceof HTMLButtonElement) {
+            button.textContent = 'Ocultar PIN';
+          }
+        } else {
+          pinElement.classList.add('hidden');
+          if (button instanceof HTMLButtonElement) {
+            button.textContent = 'Mostrar PIN';
+          }
+        }
+      }
+    </script>
   </body>
 </html>

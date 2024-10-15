@@ -81,12 +81,16 @@ if (product.isPreOrder && product.releaseDate) {
                 <div>
                   <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
                   - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
+                  <br />
+                  <span class="text-sm text-gray-600">Estado del Vinilo: {seller.estadoVinilo}</span>
+                  <br />
+                  <span class="text-sm text-gray-600">Estado de la Carátula: {seller.estadoCaratula}</span>
                 </div>
                 {/* Enlace para comprar que lleva a CartPage con parámetros */}
                 {seller.stock > 0 && (
                   <a 
                     class="bg-blue-600 text-white px-3 py-1 rounded"
-                    href={`/cartpage?productId=${product.id}&sellerId=${seller.sellerId}&sellerName=${encodeURIComponent(seller.sellerName)}&price=${seller.price}`}
+                    href={`/cartpage?productId=${product.id}&sellerId=${seller.sellerId}&sellerName=${encodeURIComponent(seller.sellerName)}&price=${seller.price}&estadoVinilo=${encodeURIComponent(seller.estadoVinilo)}&estadoCaratula=${encodeURIComponent(seller.estadoCaratula)}`}
                   >
                     {isPreOrderActive ? 'Reservar' : 'Comprar'}
                   </a>

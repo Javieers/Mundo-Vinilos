@@ -4,12 +4,21 @@ import { getAllProducts } from '../../firebase/server';
 
 const products = await getAllProducts(); // Obtener todos los productos desde el servidor
 ---
-
 <BaseLayout>
   <section class="container mx-auto px-6 py-12">
     <h2 class="text-3xl font-bold mb-6">Asignar Precio y Stock a Producto Existente</h2>
     <div id="error-container" class="text-red-600 mb-4"></div>
     <div id="success-container" class="text-green-600 mb-4"></div>
+
+    <!-- Barra de Búsqueda -->
+    <div class="mb-4">
+      <input 
+        type="text" 
+        id="searchBar" 
+        placeholder="Buscar por nombre del álbum o artista..." 
+        class="w-full border border-gray-300 rounded-md p-2"
+      />
+    </div>
 
     <form id="assignProductForm" class="space-y-4">
       <div>
@@ -23,6 +32,26 @@ const products = await getAllProducts(); // Obtener todos los productos desde el
           ))}
         </select>
       </div>
+      
+      <!-- Nuevos Campos: Estado del Vinilo y Estado de la Carátula -->
+      <div>
+        <label for="estadoVinilo" class="block text-sm font-medium text-gray-700">Estado del Vinilo</label>
+        <select id="estadoVinilo" name="estadoVinilo" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required>
+          <option value="">-- Selecciona el estado del vinilo --</option>
+          <option value="Nuevo">Nuevo</option>
+          <option value="Usado">Usado</option>
+        </select>
+      </div>
+
+      <div>
+        <label for="estadoCaratula" class="block text-sm font-medium text-gray-700">Estado de la Carátula</label>
+        <select id="estadoCaratula" name="estadoCaratula" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required>
+          <option value="">-- Selecciona el estado de la carátula --</option>
+          <option value="Nuevo">Nuevo</option>
+          <option value="Usado">Usado</option>
+        </select>
+      </div>
+
       <div>
         <label for="price" class="block text-sm font-medium text-gray-700">Precio</label>
         <input type="number" id="price" name="price" min="0" step="0.01" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
@@ -40,44 +69,73 @@ const products = await getAllProducts(); // Obtener todos los productos desde el
       const form = document.getElementById('assignProductForm');
       const errorContainer = document.getElementById('error-container');
       const successContainer = document.getElementById('success-container');
-
+      const searchBar = document.getElementById('searchBar') as HTMLInputElement | null;
+      const existingProduct = document.getElementById('existingProduct') as HTMLSelectElement | null;
+  
+      // Función para filtrar productos según la búsqueda
+      const filterProducts = () => {
+        if (!searchBar || !existingProduct) return;
+  
+        const query = searchBar.value.toLowerCase();
+        const options = existingProduct.options;
+        for (let i = 1; i < options.length; i++) { // Empezar en 1 para omitir la opción por defecto
+          const text = options[i].text.toLowerCase();
+          if (text.includes(query)) {
+            options[i].style.display = 'block';
+          } else {
+            options[i].style.display = 'none';
+          }
+        }
+      };
+  
+      // Escuchar eventos en la barra de búsqueda
+      if (searchBar) {
+        searchBar.addEventListener('input', filterProducts);
+      }
+  
       if (form) {
         form.addEventListener('submit', async (event) => {
           event.preventDefault();
-
+  
           // Limpiar contenedores de mensajes
           if (errorContainer) errorContainer.textContent = '';
           if (successContainer) successContainer.textContent = '';
-
+  
           // Obtener los valores del formulario de forma segura
-          const existingProductElement = document.getElementById('existingProduct');
-          const priceElement = document.getElementById('price');
-          const stockElement = document.getElementById('stock');
-
+          const existingProductElement = existingProduct;
+          const priceElement = document.getElementById('price') as HTMLInputElement | null;
+          const stockElement = document.getElementById('stock') as HTMLInputElement | null;
+          const estadoViniloElement = document.getElementById('estadoVinilo') as HTMLSelectElement | null;
+          const estadoCaratulaElement = document.getElementById('estadoCaratula') as HTMLSelectElement | null;
+  
           // Verificar que los elementos existen y son del tipo correcto
           if (
-            existingProductElement instanceof HTMLSelectElement &&
-            priceElement instanceof HTMLInputElement &&
-            stockElement instanceof HTMLInputElement
+            existingProductElement &&
+            priceElement &&
+            stockElement &&
+            estadoViniloElement &&
+            estadoCaratulaElement
           ) {
             const productId = existingProductElement.value;
             const price = parseFloat(priceElement.value);
             const stock = parseInt(stockElement.value, 10);
-
+            const estadoVinilo = estadoViniloElement.value;
+            const estadoCaratula = estadoCaratulaElement.value;
+  
             // Validación básica
-            if (!productId || isNaN(price) || isNaN(stock)) {
+            if (!productId || isNaN(price) || isNaN(stock) || !estadoVinilo || !estadoCaratula) {
               if (errorContainer) errorContainer.textContent = 'Por favor, completa todos los campos correctamente.';
               return;
             }
-
+  
             try {
               // Enviar la solicitud al servidor
               const response = await fetch('/api/seller/assign-product', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ productId, price, stock }),
+                body: JSON.stringify({ productId, price, stock, estadoVinilo, estadoCaratula }),
               });
-
+  
               let result;
               try {
                 result = await response.json();
@@ -85,12 +143,14 @@ const products = await getAllProducts(); // Obtener todos los productos desde el
                 console.error('Error al parsear JSON:', jsonError);
                 throw new Error('Respuesta no es JSON');
               }
-
+  
               if (response.ok) {
                 if (successContainer) successContainer.textContent = result.message;
                 existingProductElement.value = '';
                 priceElement.value = '';
                 stockElement.value = '';
+                estadoViniloElement.value = '';
+                estadoCaratulaElement.value = '';
               } else {
                 if (errorContainer) errorContainer.textContent = result.message || 'Error al asignar el producto.';
               }
@@ -104,5 +164,5 @@ const products = await getAllProducts(); // Obtener todos los productos desde el
         });
       }
     });
-  </script>
+  </script>  
 </BaseLayout>

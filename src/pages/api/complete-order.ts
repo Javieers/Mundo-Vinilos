@@ -2,6 +2,8 @@
 
 import type { APIRoute } from 'astro';
 import { adminAuth, adminFirestore } from '../../firebase/server';
+import admin from 'firebase-admin';
+import bcrypt from 'bcrypt'; // Solo si hasheaste el PIN
 
 export const POST: APIRoute = async ({ request, cookies }) => {
   const sessionCookie = cookies.get('session')?.value;
@@ -14,6 +16,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
   }
 
   try {
+    // Verificar la cookie de sesión
     const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
 
     if (!decodedClaims || !decodedClaims.seller) {
@@ -24,10 +27,10 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const sellerId = decodedClaims.uid;
-    const { orderId } = await request.json();
+    const { orderId, pin } = await request.json();
 
-    if (!orderId) {
-      return new Response(JSON.stringify({ message: 'Falta el ID de la orden' }), {
+    if (!orderId || !pin) {
+      return new Response(JSON.stringify({ message: 'Falta el ID de la orden o el PIN' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -53,10 +56,32 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    if (orderData.status === 'Completado') {
+      return new Response(JSON.stringify({ message: 'Orden ya está completada' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Verificar el PIN
+    const isPinValid = orderData.pin === pin;
+    // Si hasheaste el PIN, utiliza bcrypt.compare
+    // const isPinValid = await bcrypt.compare(pin, orderData.pin);
+
+    if (!isPinValid) {
+      return new Response(JSON.stringify({ message: 'PIN inválido' }), {
+        status: 401,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
     // Actualizar el estado de la orden
     await orderRef.update({
       status: 'Completado',
+      completedAt: admin.firestore.FieldValue.serverTimestamp(),
     });
+
+    // Opcional: Enviar notificación al usuario de que la orden ha sido completada
 
     return new Response(JSON.stringify({ message: 'Orden marcada como completada' }), {
       status: 200,
