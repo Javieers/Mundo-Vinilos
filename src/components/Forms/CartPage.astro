@@ -17,13 +17,8 @@ if (sessionCookie) {
     user = decodedClaims;
   } catch (error) {
     console.error('Error al verificar la cookie de sesión:', error);
-    // Puedes redirigir al usuario a la página de login o mostrar un mensaje de error
+    // Puedes manejar el error o simplemente dejar 'user' como null
   }
-}
-
-if (!user) {
-  // Usuario no autenticado: redirigir a la página de inicio de sesión
-  return Astro.redirect('/login');
 }
 
 // Obtener parámetros de la URL
@@ -138,21 +133,34 @@ if (product && product.isPreOrder && product.releaseDate) {
             )}
           </div>
 
-          <!-- Formulario de Compra -->
-          <form id="purchaseForm" class="mt-6">
-            <!-- Campos ocultos -->
-            <input type="hidden" name="productId" value={productId} />
-            <input type="hidden" name="sellerId" value={sellerId} />
-            <input type="hidden" name="price" value={price} />
-            <input type="hidden" name="quantity" value="1" />
-            <input type="hidden" name="estadoVinilo" value={estadoVinilo} />
-            <input type="hidden" name="estadoCaratula" value={estadoCaratula} />
+          <!-- Mostrar mensaje o botón según el estado de autenticación -->
+          <div class="mt-6">
+            {user ? (
+              <!-- Formulario de Compra -->
+              <form id="purchaseForm">
+                <!-- Campos ocultos -->
+                <input type="hidden" name="productId" value={productId} />
+                <input type="hidden" name="sellerId" value={sellerId} />
+                <input type="hidden" name="price" value={price} />
+                <input type="hidden" name="quantity" value="1" />
+                <input type="hidden" name="estadoVinilo" value={estadoVinilo} />
+                <input type="hidden" name="estadoCaratula" value={estadoCaratula} />
 
-            <!-- Botón de Comprar -->
-            <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
-              Confirmar Compra
-            </button>
-          </form>
+                <!-- Botón de Comprar -->
+                <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700">
+                  Confirmar Compra
+                </button>
+              </form>
+            ) : (
+              <!-- Mensaje de Iniciar Sesión -->
+              <div class="bg-red-100 border-l-4 border-red-500 text-red-700 p-4">
+                <p class="font-bold">Debes iniciar sesión para realizar la compra.</p>
+                <p>
+                  Por favor, <a href="/login" class="text-blue-600 underline">inicia sesión</a> o <a href="/register" class="text-blue-600 underline">regístrate</a> para continuar.
+                </p>
+              </div>
+            )}
+          </div>
 
         </div>
       </div>
