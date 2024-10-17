@@ -1,5 +1,3 @@
-// src/pages/api/seller/edit-product.ts
-
 import type { APIRoute } from 'astro';
 import { adminAuth, adminFirestore } from '../../../firebase/server';
 import { FieldValue } from 'firebase-admin/firestore';
@@ -26,10 +24,19 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     const sellerId = decodedClaims.uid;
-    const { productId, price, stock } = await request.json();
+    const { productId, price, stock, estadoVinilo, estadoCaratula } = await request.json();
 
-    if (!productId || price == null || stock == null) {
+    if (!productId || price == null || stock == null || !estadoVinilo || !estadoCaratula) {
       return new Response(JSON.stringify({ message: 'Datos de producto inválidos' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Validar estados
+    const validStates = ['nuevo', 'usado'];
+    if (!validStates.includes(estadoVinilo) || !validStates.includes(estadoCaratula)) {
+      return new Response(JSON.stringify({ message: 'Estado inválido para el producto' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -54,6 +61,8 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     await productRef.update({
       price,
       stock,
+      estadoVinilo,
+      estadoCaratula,
       updatedAt: FieldValue.serverTimestamp(),
     });
 

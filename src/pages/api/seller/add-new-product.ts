@@ -61,6 +61,26 @@ export const POST: APIRoute = async ({ request, cookies }) => {
       });
     }
 
+    // **Nueva validación: Verificar si el producto ya existe**
+    const existingProductSnapshot = await adminFirestore
+      .collection('products')
+      .where('albumName', '==', albumName)
+      .limit(1)
+      .get();
+
+    if (!existingProductSnapshot.empty) {
+      console.error(`Producto con albumName "${albumName}" ya existe.`);
+      return new Response(
+        JSON.stringify({
+          message: 'Este producto ya existe, por favor agrega precio y stock en la sección con el mismo nombre.',
+        }),
+        {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        }
+      );
+    }
+
     // Convertir releaseDate a Timestamp de Firestore si está presente
     const releaseDateTimestamp = releaseDate ? admin.firestore.Timestamp.fromDate(new Date(releaseDate)) : null;
 

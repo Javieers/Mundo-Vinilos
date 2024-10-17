@@ -1,6 +1,6 @@
 // src/pages/api/auth/register.ts
 import type { APIRoute } from 'astro';
-import { adminAuth, adminFirestore } from '../../../firebase/server';
+import { admin, adminAuth, adminFirestore } from '../../../firebase/server';
 import * as bcrypt from 'bcrypt';
 
 export const POST: APIRoute = async ({ request }) => {
@@ -15,6 +15,15 @@ export const POST: APIRoute = async ({ request }) => {
       return new Response(JSON.stringify({
         status: 400,
         message: 'Faltan datos en el formulario'
+      }), { status: 400 });
+    }
+
+    // Validar contraseña: al menos 6 caracteres, incluyendo letras y números
+    const passwordRegex = /^(?=.*[A-Za-z])(?=.*\d)[A-Za-z\d]{6,}$/;
+    if (!passwordRegex.test(password)) {
+      return new Response(JSON.stringify({
+        status: 400,
+        message: 'La contraseña debe tener al menos 6 caracteres, incluyendo letras y números.'
       }), { status: 400 });
     }
 
@@ -33,7 +42,7 @@ export const POST: APIRoute = async ({ request }) => {
     const userRecord = await adminAuth.createUser({
       email,
       password,
-      displayName: firstName
+      displayName: `${firstName} ${lastName}`,
     });
 
     await usersRef.doc(userRecord.uid).set({
@@ -41,6 +50,7 @@ export const POST: APIRoute = async ({ request }) => {
       lastName,
       email,
       password: hashedPassword,
+      createdAt: admin.firestore.FieldValue.serverTimestamp(), // Marca de tiempo
     });
 
     return new Response(JSON.stringify({

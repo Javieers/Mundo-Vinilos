@@ -30,6 +30,14 @@ try {
 
     if (productDoc.exists) {
       product = { id: productDoc.id, ...productDoc.data() };
+
+      // Obtener detalles adicionales del producto desde la colección 'products' si es necesario
+      const mainProductDoc = await adminFirestore.collection('products').doc(productId).get();
+      if (mainProductDoc.exists) {
+        const mainProductData = mainProductDoc.data();
+        // Combinar los datos del producto principal con los datos del vendedor
+        product = { ...mainProductData, ...product };
+      }
     } else {
       return Astro.redirect('/seller/dashboard');
     }
@@ -41,6 +49,7 @@ try {
   return Astro.redirect('/login');
 }
 ---
+
 <BaseLayout>
   <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
     <h2 class="text-2xl font-bold mb-6">Editar Producto</h2>
@@ -81,6 +90,60 @@ try {
         />
       </div>
 
+      <!-- Campo para el Estado del Vinilo -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Estado del Vinilo</label>
+        <div class="mt-1">
+          <label class="inline-flex items-center">
+            <input
+              type="radio"
+              name="estadoVinilo"
+              value="nuevo"
+              class="form-radio"
+              checked={product.estadoVinilo === 'nuevo'}
+            />
+            <span class="ml-2">Nuevo</span>
+          </label>
+          <label class="inline-flex items-center ml-6">
+            <input
+              type="radio"
+              name="estadoVinilo"
+              value="usado"
+              class="form-radio"
+              checked={product.estadoVinilo === 'usado'}
+            />
+            <span class="ml-2">Usado</span>
+          </label>
+        </div>
+      </div>
+
+      <!-- Campo para el Estado de la Carátula -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700">Estado de la Carátula</label>
+        <div class="mt-1">
+          <label class="inline-flex items-center">
+            <input
+              type="radio"
+              name="estadoCaratula"
+              value="nuevo"
+              class="form-radio"
+              checked={product.estadoCaratula === 'nuevo'}
+            />
+            <span class="ml-2">Nuevo</span>
+          </label>
+          <label class="inline-flex items-center ml-6">
+            <input
+              type="radio"
+              name="estadoCaratula"
+              value="usado"
+              class="form-radio"
+              checked={product.estadoCaratula === 'usado'}
+            />
+            <span class="ml-2">Usado</span>
+          </label>
+        </div>
+      </div>
+
       <!-- Botón de Enviar -->
       <div>
         <button
@@ -100,10 +163,15 @@ try {
       const priceInput = document.getElementById('price');
       const stockInput = document.getElementById('stock');
 
+      const estadoViniloInput = document.querySelector('input[name="estadoVinilo"]:checked');
+      const estadoCaratulaInput = document.querySelector('input[name="estadoCaratula"]:checked');
+
       const price = parseFloat(priceInput.value);
       const stock = parseInt(stockInput.value, 10);
+      const estadoVinilo = estadoViniloInput ? estadoViniloInput.value : null;
+      const estadoCaratula = estadoCaratulaInput ? estadoCaratulaInput.value : null;
 
-      if (isNaN(price) || isNaN(stock)) {
+      if (isNaN(price) || isNaN(stock) || !estadoVinilo || !estadoCaratula) {
         alert('Por favor completa todos los campos correctamente.');
         return;
       }
@@ -118,6 +186,8 @@ try {
             productId: product.id,
             price,
             stock,
+            estadoVinilo,
+            estadoCaratula,
           }),
         });
 
