@@ -42,6 +42,7 @@ try {
     const data = doc.data();
     let productName = data.productName;
     let storeName = data.storeName;
+    let numeroTelefonico = null;
 
     // Si no tenemos el nombre del producto, lo obtenemos de la colección 'products'
     if (!productName) {
@@ -50,9 +51,10 @@ try {
     }
 
     // Si no tenemos el nombre de la tienda, lo obtenemos de la colección 'sellers'
-    if (!storeName) {
+    if (!storeName || !numeroTelefonico) {
       const sellerDoc = await adminFirestore.collection('sellers').doc(data.sellerId).get();
       storeName = sellerDoc.exists ? sellerDoc.data()?.storeName : 'Tienda no disponible';
+      numeroTelefonico = sellerDoc.exists ? sellerDoc.data()?.numeroTelefonico : 'No disponible';
     }
 
     return {
@@ -60,6 +62,7 @@ try {
       ...data,
       productName,
       storeName,
+      numeroTelefonico, // Agregar el número de teléfono del vendedor
       createdAt: data.createdAt ? data.createdAt.toDate() : null, // Manejar undefined
     };
   });
@@ -87,10 +90,11 @@ try {
         </>
       ) : (
         <>
-          <h1 class="text-3xl font-bold mb-4">¡Bienvenido, {userData.firstName ?? userData.email}!</h1>
+          <h1 class="text-3xl font-bold mb-4">¡Bienvenido/a, {userData.firstName ?? userData.email}!</h1>
           <p class="text-gray-700 mb-6">Esta es tu página de perfil. Aquí puedes ver tus compras y actualizar tu información.</p>
 
           <h2 class="text-2xl font-semibold mb-4">Mis Compras</h2>
+          <p class="text-gray-700 mb-6">Presenta el Order ID en la tienda donde hiciste tu compra, luego muestra tu PIN secreto al vendedor para confirmar tu compra.</p>
           {purchases.length > 0 ? (
             <div class="overflow-x-auto">
               <table class="min-w-full bg-white">
@@ -102,7 +106,8 @@ try {
                     <th class="py-2 px-4 border-b">Precio Total</th>
                     <th class="py-2 px-4 border-b">PIN Secreto</th>
                     <th class="py-2 px-4 border-b">Estado</th>
-                    <th class="py-2 px-4 border-b">Detalles</th> <!-- Nueva columna -->
+                    <th class="py-2 px-4 border-b">Detalles</th>
+                    <th class="py-2 px-4 border-b">Contacto Vendedor</th> <!-- Nueva columna -->
                   </tr>
                 </thead>
                 <tbody>
@@ -120,6 +125,13 @@ try {
                       <td class="py-2 px-4 border-b">
                         <a href={`/purchase-details/${purchase.id}`} class="text-indigo-600 hover:text-indigo-900">Detalles del Pedido</a>
                       </td>
+                      <td class="py-2 px-4 border-b">
+                        {purchase.numeroTelefonico ? (
+                          <a href={`tel:${purchase.numeroTelefonico}`} class="text-green-600 hover:text-green-900">{purchase.numeroTelefonico}</a>
+                        ) : (
+                          'No disponible'
+                        )}
+                      </td> <!-- Nueva columna con el número de teléfono del vendedor -->
                     </tr>
                   ))}
                 </tbody>
