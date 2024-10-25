@@ -1,10 +1,13 @@
 ---
-import BaseLayout from "../../layouts/BaseLayout.astro";  // Verifica la ruta correcta
-import { getSellerInfo } from '../../firebase/server';  // Asegúrate de que el archivo sea el correcto
+import BaseLayout from "../../layouts/BaseLayout.astro"; // Verifica la ruta correcta
+import { getSellerInfo, adminFirestore } from '../../firebase/server'; // Asegúrate de que el archivo sea el correcto
 import { format } from 'date-fns'; // Librería para formatear fechas, instala si no la tienes
+import Star from '../../components/Star.astro'; // Importar el componente Star
 
 const { id } = Astro.params;
-const sellerInfo = await getSellerInfo(id);  // Obtener los datos del vendedor
+
+// Obtener los datos del vendedor
+const sellerInfo = await getSellerInfo(id); // Debes implementar esta función en tu servidor
 
 if (!sellerInfo) {
   throw new Error('Vendedor no encontrado');
@@ -12,20 +15,87 @@ if (!sellerInfo) {
 
 const { seller, products } = sellerInfo;
 
-// Formatear la fecha de actualización si está disponible
-const formattedUpdatedAt = seller.updatedAt
-  ? format(seller.updatedAt, 'dd de MMMM de yyyy, h:mm:ss aaaa')
-  : 'No disponible';
+// Obtener todas las reseñas del vendedor
+const reviewsSnapshot = await adminFirestore.collection('reviews').where('sellerId', '==', id).get();
+
+let reviews: {
+  reviewText: string;
+  rating: number;
+  createdAt: any;
+  userName: string;
+  productName: string;
+}[] = [];
+
+let averageRating: number | null = null;
+
+if (!reviewsSnapshot.empty) {
+  const reviewDocs = reviewsSnapshot.docs;
+
+  // Extraer los userIds y productIds únicos
+  const userIds = Array.from(new Set(reviewDocs.map(doc => doc.data().userId)));
+  const productIds = Array.from(new Set(reviewDocs.map(doc => doc.data().productId)));
+
+  // Firestore permite un máximo de 10 elementos en una consulta 'in'
+  // Si hay más de 10, necesitarás dividir las consultas
+  const limitedUserIds = userIds.slice(0, 10);
+  const limitedProductIds = productIds.slice(0, 10);
+
+  // Obtener los usuarios
+  const usersSnapshot = await adminFirestore.collection('users').where('__name__', 'in', limitedUserIds).get();
+  const usersMap: { [key: string]: { firstName: string; lastName: string } } = {};
+  usersSnapshot.forEach(doc => {
+    const data = doc.data();
+    usersMap[doc.id] = { firstName: data.firstName || '', lastName: data.lastName || '' };
+  });
+
+  // Obtener los productos
+  const productsSnapshot = await adminFirestore.collection('products').where('__name__', 'in', limitedProductIds).get();
+  const productsMap: { [key: string]: { name: string } } = {};
+  productsSnapshot.forEach(doc => {
+    const data = doc.data();
+    productsMap[doc.id] = { name: data.name || 'Sin nombre' };
+  });
+
+  // Combinar la información
+  reviews = reviewDocs.map(doc => {
+    const data = doc.data();
+    const user = usersMap[data.userId] || { firstName: 'Usuario', lastName: '' };
+    const product = productsMap[data.productId] || { name: 'Producto no disponible' };
+    return {
+      reviewText: data.reviewText,
+      rating: data.rating,
+      createdAt: data.createdAt,
+      userName: `${user.firstName} ${user.lastName}`,
+      productName: product.name,
+    };
+  });
+
+  // Calcular el promedio de calificaciones
+  const totalRating = reviews.reduce((sum, review) => sum + review.rating, 0);
+  averageRating = parseFloat((totalRating / reviews.length).toFixed(2)); // Redondear a 2 decimales
+}
 ---
 <BaseLayout>
   <section>
     <div class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 items-center px-8 py-24">
-      <div class="bg-white p-6 rounded-lg shadow-lg">
+      <div class="bg-white p-8 rounded-lg shadow-lg">
         <!-- Imagen del Vendedor -->
-        <img src={seller.sellerImage} alt={seller.storeName} class="w-full h-auto max-h-96 object-contain rounded-md" />
+        <img src={seller.sellerImage} alt={seller.storeName} class="w-full h-auto max-h-96 object-contain rounded-md mb-6" />
 
         <!-- Información Básica -->
-        <h3 class="mt-4 text-lg font-semibold">{seller.storeName}</h3>
+        <div class="flex items-center justify-between">
+          <div>
+            <h2 class="mt-4 text-2xl font-semibold">{seller.storeName}</h2>
+            {/* Mostrar Calificación Promedio */}
+            {averageRating !== null && (
+              <div class="flex items-center mt-2">
+                <span class="text-lg font-semibold mr-2">{averageRating}/10</span>
+                <Star filled={true} />
+              </div>
+            )}
+          </div>
+        </div>
+
         <p class="text-gray-700"><strong>Dirección:</strong> {seller.direccion}</p>
         <p class="text-gray-700"><strong>Email:</strong> {seller.email}</p>
         <p class="text-gray-700"><strong>Región:</strong> {seller.region}</p>
@@ -41,21 +111,25 @@ const formattedUpdatedAt = seller.updatedAt
 
         <!-- Horario de Atención -->
         <div class="mt-4">
-          <h4 class="text-xl font-semibold">Horario de Atención</h4>
+          <h3 class="text-xl font-semibold">Horario de Atención</h3>
           <p class="text-gray-700"><strong>Desde:</strong> {seller.horarioAtencion.desde}</p>
           <p class="text-gray-700"><strong>Hasta:</strong> {seller.horarioAtencion.hasta}</p>
         </div>
-
-        <!-- Fecha de Actualización -->
-        <p class="text-gray-500 text-sm mt-2"><strong>Última Actualización:</strong> {formattedUpdatedAt}</p>
-
+        
         <!-- Productos Disponibles -->
-        <h4 class="mt-8 text-xl font-semibold">Productos Disponibles</h4>
-        <ul class="mt-4">
-          {products.length > 0 ? (
+        <h3 class="mt-8 text-2xl font-semibold">Productos Disponibles</h3>
+        <ul class="mt-4 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          {products && products.length > 0 ? (
             products.map(product => (
-              <li class="border-b py-4">
-                <a href={`/product/${product.productId}`} class="text-blue-600 underline">{product.name}</a> - ${product.price} {product.stock === 0 ? '(Agotado)' : `(Stock: ${product.stock})`}
+              <li class="border p-4 rounded-lg shadow-sm hover:shadow-md transition-shadow duration-200">
+                {/* Verificar si el producto tiene un precio definido */}
+                {product.price !== undefined && typeof product.price === 'number' ? (
+                  <p class="text-gray-700 mt-2">Precio: ${product.price.toLocaleString('es-ES')}</p>
+                ) : (
+                  <p class="text-gray-700 mt-2">Precio: No disponible</p>
+                )}
+                <p class="text-gray-700">Stock: {product.stock > 0 ? product.stock : <span class="text-red-500">Agotado</span>}</p>
+                <a href={`/product/${product.productId}`} class="text-blue-600 hover:underline font-medium">{product.name}</a>
               </li>
             ))
           ) : (
@@ -64,13 +138,21 @@ const formattedUpdatedAt = seller.updatedAt
         </ul>
 
         <!-- Reseñas -->
-        <h4 class="mt-12 text-xl font-semibold">Reseñas</h4>
-        <div class="mt-4">
-          {seller.reviews.length > 0 ? (
-            seller.reviews.map(review => (
-              <div class="border-b py-4">
-                <p class="text-gray-700">{review.text}</p>
-                <p class="text-gray-500 text-sm">- {review.user}</p>
+        <h3 class="mt-12 text-2xl font-semibold">Reseñas</h3>
+        <div class="mt-4 space-y-6">
+          {reviews.length > 0 ? (
+            reviews.map(review => (
+              <div class="border-b pb-4">
+                <div class="flex items-center justify-between">
+                  <h4 class="text-lg font-medium">{review.userName}</h4>
+                  <span class="text-yellow-500 flex items-center">
+                    <Star filled={true} />
+                    <span class="ml-2">{review.rating}/10</span>
+                  </span>
+                </div>
+                <p class="text-gray-700 mt-2">{review.reviewText}</p>
+                <p class="text-gray-500 text-sm mt-1">{format(review.createdAt.toDate(), 'dd/MM/yyyy')}</p>
+                <p class="text-gray-600 mt-1"><strong>Producto:</strong> {review.productName}</p>
               </div>
             ))
           ) : (

@@ -1,0 +1,132 @@
+<section class="mx-auto w-full lg:px-24 max-w-7xl md:px-12 px-8 py-24">
+    <div class="bg-white p-8 rounded-lg shadow-lg">
+      <h1 class="text-3xl font-bold mb-6">Soporte / Contáctanos</h1>
+      
+      <!-- Instrucciones -->
+      <p class="mb-6">Por favor, completa el siguiente formulario y nos pondremos en contacto contigo a la brevedad.</p>
+      
+      <!-- Formulario de Soporte -->
+      <form id="support-form" class="space-y-4">
+        <!-- Asunto (Obligatorio) -->
+        <div>
+          <label for="subject" class="block text-gray-700 font-medium">Asunto<span class="text-red-500">*</span></label>
+          <input
+            type="text"
+            id="subject"
+            name="subject"
+            required
+            class="mt-1 block w-full p-2 border border-gray-300 rounded"
+            placeholder="Describe el motivo de tu solicitud"
+          />
+        </div>
+
+        <!-- Número de Orden (Opcional) -->
+        <div>
+          <label for="orderNumber" class="block text-gray-700 font-medium">Número de Orden</label>
+          <input
+            type="text"
+            id="orderNumber"
+            name="orderNumber"
+            class="mt-1 block w-full p-2 border border-gray-300 rounded"
+            placeholder="Opcional: Número de tu orden"
+          />
+        </div>
+
+        <!-- Nombre del Vendedor (Opcional) -->
+        <div>
+          <label for="sellerName" class="block text-gray-700 font-medium">Nombre del Vendedor</label>
+          <input
+            type="text"
+            id="sellerName"
+            name="sellerName"
+            class="mt-1 block w-full p-2 border border-gray-300 rounded"
+            placeholder="Opcional: Nombre del vendedor"
+          />
+        </div>
+
+        <!-- Motivo (Obligatorio) -->
+        <div>
+          <label for="message" class="block text-gray-700 font-medium">Motivo<span class="text-red-500">*</span></label>
+          <textarea
+            id="message"
+            name="message"
+            rows="5"
+            required
+            class="mt-1 block w-full p-2 border border-gray-300 rounded"
+            placeholder="Describe detalladamente tu problema o solicitud"
+          ></textarea>
+        </div>
+
+        <!-- Botón de Envío -->
+        <div>
+          <button
+            type="submit"
+            class="w-full bg-blue-600 text-white py-2 px-4 rounded hover:bg-blue-700"
+          >
+            Enviar
+          </button>
+        </div>
+      </form>
+
+      <!-- Mensajes de Error y Éxito -->
+      <div id="form-messages" class="mt-4"></div>
+    </div>
+  </section>
+
+  <!-- Script para Manejar el Envío del Formulario -->
+  <script type="module">
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('support-form');
+      const messagesDiv = document.getElementById('form-messages');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault(); // Prevenir el comportamiento por defecto del formulario
+
+        // Limpiar mensajes previos
+        messagesDiv.innerHTML = '';
+
+        // Obtener los valores de los campos
+        const subject = document.getElementById('subject').value.trim();
+        const orderNumber = document.getElementById('orderNumber').value.trim();
+        const sellerName = document.getElementById('sellerName').value.trim();
+        const message = document.getElementById('message').value.trim();
+
+        // Validar campos obligatorios
+        if (!subject || !message) {
+          messagesDiv.innerHTML = '<p class="text-red-500">Por favor, completa los campos obligatorios.</p>';
+          return;
+        }
+
+        // Preparar los datos para enviar usando FormData
+        const formData = new FormData();
+        formData.append('subject', subject);
+        formData.append('orderNumber', orderNumber);
+        formData.append('sellerName', sellerName);
+        formData.append('message', message);
+
+        try {
+          // Enviar los datos al endpoint de API
+          const response = await fetch('/api/support', {
+            method: 'POST',
+            body: formData,
+            credentials: 'include', // Asegura que las cookies se envíen con la solicitud
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            // Mostrar mensaje de éxito
+            messagesDiv.innerHTML = '<p class="text-green-500">Tu solicitud de soporte ha sido enviada exitosamente. Nos pondremos en contacto contigo a la brevedad.</p>';
+            form.reset(); // Resetear el formulario
+          } else {
+            // Mostrar mensaje de error
+            messagesDiv.innerHTML = `<p class="text-red-500">${result.message || 'Error al enviar la solicitud de soporte.'}</p>`;
+          }
+        } catch (error) {
+          console.error('Error al enviar la solicitud de soporte:', error);
+          messagesDiv.innerHTML = '<p class="text-red-500">Error al enviar la solicitud. Por favor, intenta nuevamente más tarde.</p>';
+        }
+      });
+    });
+  </script>
+

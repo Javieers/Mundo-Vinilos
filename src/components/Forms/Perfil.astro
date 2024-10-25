@@ -15,6 +15,7 @@ if (!sessionCookie) {
 let userId: string;
 let userData: UserData = { email: '' };
 let purchases: any[] = [];
+let supportCases: any[] = []; // <-- Nueva variable para los casos de soporte
 let errorOccurred = false;
 
 try {
@@ -69,6 +70,34 @@ try {
 
   purchases = await Promise.all(purchasePromises);
 
+  // Obtener los casos de soporte del usuario
+  const supportSnapshot = await adminFirestore
+    .collection('support')
+    .where('userId', '==', userId)
+    .orderBy('createdAt', 'desc')
+    .get();
+
+  const supportPromises = supportSnapshot.docs.map(async (doc) => {
+    const data = doc.data();
+    const answersSnapshot = await doc.ref.collection('answer').orderBy('createdAt', 'asc').get();
+    const answers = answersSnapshot.docs.map(answerDoc => {
+      const answerData = answerDoc.data();
+      return {
+        id: answerDoc.id,
+        message: answerData.message,
+        createdAt: answerData.createdAt ? answerData.createdAt.toDate() : null,
+      };
+    });
+    return {
+      id: doc.id,
+      ...data,
+      createdAt: data.createdAt ? data.createdAt.toDate() : null,
+      answers,
+    };
+  });
+
+  supportCases = await Promise.all(supportPromises);
+
 } catch (error) {
   console.error('Error al obtener los datos del usuario o las compras:', error);
   errorOccurred = true;
@@ -81,7 +110,7 @@ try {
     <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
   </head>
   <body class="bg-gray-100 font-sans">
-    <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+    <section class="max-w-5xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
       {errorOccurred ? (
         <>
           <h1 class="text-3xl font-bold mb-4">Ocurrió un error</h1>
@@ -93,6 +122,7 @@ try {
           <h1 class="text-3xl font-bold mb-4">¡Bienvenido/a, {userData.firstName ?? userData.email}!</h1>
           <p class="text-gray-700 mb-6">Esta es tu página de perfil. Aquí puedes ver tus compras y actualizar tu información.</p>
 
+          <!-- Sección de Compras -->
           <h2 class="text-2xl font-semibold mb-4">Mis Compras</h2>
           <p class="text-gray-700 mb-6">Presenta el Order ID en la tienda donde hiciste tu compra, luego muestra tu PIN secreto al vendedor para confirmar tu compra.</p>
           {purchases.length > 0 ? (
@@ -107,7 +137,7 @@ try {
                     <th class="py-2 px-4 border-b">PIN Secreto</th>
                     <th class="py-2 px-4 border-b">Estado</th>
                     <th class="py-2 px-4 border-b">Detalles</th>
-                    <th class="py-2 px-4 border-b">Contacto Vendedor</th> <!-- Nueva columna -->
+                    <th class="py-2 px-4 border-b">Contacto Vendedor</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -131,7 +161,7 @@ try {
                         ) : (
                           'No disponible'
                         )}
-                      </td> <!-- Nueva columna con el número de teléfono del vendedor -->
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -139,6 +169,38 @@ try {
             </div>
           ) : (
             <p class="text-gray-700">No has realizado compras aún.</p>
+          )}
+
+          <!-- Nueva Sección de Mis Casos -->
+          <h2 class="text-2xl font-semibold mt-10 mb-4">Mis Casos</h2>
+          {supportCases.length > 0 ? (
+            <div class="space-y-6">
+              {supportCases.map(supportCase => (
+                <div class="p-4 border border-gray-300 rounded-lg">
+                  <p><strong>Asunto:</strong> {supportCase.subject}</p>
+                  {supportCase.orderNumber && <p><strong>Número de Orden:</strong> {supportCase.orderNumber}</p>}
+                  {supportCase.sellerName && <p><strong>Nombre del Vendedor:</strong> {supportCase.sellerName}</p>}
+                  <p><strong>Mensaje:</strong> {supportCase.message}</p>
+                  <p><strong>Fecha de Creación:</strong> {supportCase.createdAt?.toLocaleString()}</p>
+
+                  {supportCase.answers.length > 0 ? (
+                    <div class="mt-4">
+                      <h3 class="text-xl font-semibold">Respuestas del Administrador:</h3>
+                      {supportCase.answers.map(answer => (
+                        <div class="mt-2 p-2 border border-green-300 rounded-lg bg-green-50">
+                          <p>{answer.message}</p>
+                          <p class="text-sm text-gray-500">{answer.createdAt?.toLocaleString()}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p class="mt-4 text-gray-500">Aún no hay respuestas del administrador.</p>
+                  )}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p class="text-gray-700">No tienes casos de soporte.</p>
           )}
 
           <!-- Enlace para cerrar sesión -->

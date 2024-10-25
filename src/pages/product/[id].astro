@@ -1,8 +1,9 @@
 ---
 import BaseLayout from "../../layouts/BaseLayout.astro";
-import { getProductById, getSellerProductInfo } from '../../firebase/server';
+import { getProductById, getSellerProductInfo, adminFirestore } from '../../firebase/server'; // Asegúrate de importar adminFirestore
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import Star from '../../components/Star.astro'; // Importar el componente Star
 
 const { id } = Astro.params;
 
@@ -14,15 +15,58 @@ if (!product) {
 }
 
 // Obtener información de los vendedores que ofrecen este producto
-const sellers = await getSellerProductInfo(id);
+let sellers = await getSellerProductInfo(id);
+
+// Obtener los sellerIds
+const sellerIds = sellers.map(seller => seller.sellerId);
+
+// Firestore permite un máximo de 10 elementos en una consulta 'in'
+if (sellerIds.length > 10) {
+  // Necesitarías dividir las consultas o implementar otra estrategia
+  throw new Error('Demasiados vendedores para calcular las calificaciones promedio.');
+}
+
+// Obtener todas las reseñas para estos sellerIds
+let reviewsSnapshot = await adminFirestore.collection('reviews').where('sellerId', 'in', sellerIds).get();
+
+// Crear un mapa para almacenar las sumas y conteos de ratings
+const ratingMap = {};
+
+// Procesar las reseñas
+if (!reviewsSnapshot.empty) {
+  reviewsSnapshot.forEach(doc => {
+    const data = doc.data();
+    const sellerId = data.sellerId;
+    const rating = data.rating;
+
+    if (ratingMap[sellerId]) {
+      ratingMap[sellerId].sum += rating;
+      ratingMap[sellerId].count += 1;
+    } else {
+      ratingMap[sellerId] = { sum: rating, count: 1 };
+    }
+  });
+}
+
+// Agregar averageRating a cada vendedor
+sellers = sellers.map(seller => {
+  const { sellerId } = seller;
+  if (ratingMap[sellerId]) {
+    const average = parseFloat((ratingMap[sellerId].sum / ratingMap[sellerId].count).toFixed(2));
+    return { ...seller, averageRating: average };
+  } else {
+    return { ...seller, averageRating: null }; // No hay reseñas
+  }
+});
 
 // Verificar si es preventa y si la fecha de salida aún no ha pasado
 let isPreOrderActive = false;
+let formattedReleaseDate = '';
 if (product.isPreOrder && product.releaseDate) {
   const currentDate = new Date();
   const releaseDate = product.releaseDate.toDate(); // Convertir Timestamp a Date
   isPreOrderActive = releaseDate > currentDate;
-  var formattedReleaseDate = format(releaseDate, "dd 'de' MMMM 'de' yyyy", { locale: es });
+  formattedReleaseDate = format(releaseDate, "dd 'de' MMMM 'de' yyyy", { locale: es });
 }
 ---
 <BaseLayout>
@@ -49,6 +93,12 @@ if (product.isPreOrder && product.releaseDate) {
           {product.genres && product.genres.length > 0 && (
             <p class="text-gray-700"><strong>Géneros:</strong> {product.genres.join(', ')}</p>
           )}
+          {/* Eliminar la referencia a product.price si no existe */}
+          {/* {product.price !== undefined && typeof product.price === 'number' ? (
+            <p class="text-gray-700 mt-2">Precio: ${product.price.toLocaleString('es-ES')}</p>
+          ) : (
+            <p class="text-gray-700 mt-2">Precio: No disponible</p>
+          )} */}
           {product.additionalInfo && (
             <div class="mt-4">
               <h2 class="text-xl font-semibold">Información Adicional:</h2>
@@ -62,7 +112,7 @@ if (product.isPreOrder && product.releaseDate) {
             </div>
           )}
 
-          <!-- Mensaje de reserva si es preventa activa -->
+          {/* Mensaje de reserva si es preventa activa */}
           {isPreOrderActive && (
             <div class="mt-4">
               <p class="text-red-600 font-semibold">Este producto estará disponible a partir del {formattedReleaseDate}. Puedes reservarlo ahora.</p>
@@ -79,9 +129,32 @@ if (product.isPreOrder && product.releaseDate) {
             sellers.map(seller => (
               <li class="border-b py-4 flex items-center justify-between" id={`seller-${seller.sellerId}`}>
                 <div>
-                  <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline">{seller.sellerName}</a>
-                  - ${seller.price} {seller.stock === 0 ? '(Agotado)' : `(Stock: ${seller.stock})`}
-                  <br />
+                  <a href={`/seller/${seller.sellerId}`} class="text-blue-600 underline flex items-center">
+                    {seller.sellerName}
+                    {/* Mostrar calificación promedio si existe */}
+                    {seller.averageRating !== null && (
+                      <span class="flex items-center ml-2 text-sm text-yellow-500">
+                        {/* Estrella */}
+                        <Star filled={true} />
+                        {/* Nota */}
+                        <span class="ml-1">{seller.averageRating}/10</span>
+                      </span>
+                    )}
+                  </a>
+                  {/* Mostrar el precio específico del vendedor */}
+                  {seller.price !== undefined && typeof seller.price === 'number' ? (
+                    <p class="text-gray-700 mt-2">Precio: ${seller.price.toLocaleString('es-ES')}</p>
+                  ) : (
+                    <p class="text-gray-700 mt-2">Precio: No disponible</p>
+                  )}
+                  {/* Mostrar el stock específico del vendedor */}
+                  {seller.stock !== undefined && typeof seller.stock === 'number' ? (
+                    <p class="text-gray-700">
+                      Stock: {seller.stock > 0 ? seller.stock : <span class="text-red-500">Agotado</span>}
+                    </p>
+                  ) : (
+                    <p class="text-gray-700">Stock: No disponible</p>
+                  )}
                   <span class="text-sm text-gray-600">Estado del Vinilo: {seller.estadoVinilo}</span>
                   <br />
                   <span class="text-sm text-gray-600">Estado de la Carátula: {seller.estadoCaratula}</span>

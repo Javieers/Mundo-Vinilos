@@ -1,0 +1,169 @@
+---
+import BaseLayout from '../../layouts/BaseLayout.astro';
+import { adminAuth, adminFirestore } from '../../firebase/server';
+import { Timestamp } from 'firebase-admin/firestore';
+
+// Definir interfaces para tipar correctamente los datos
+interface Order {
+  id: string;
+  orderId: string;
+  productId: string;
+  userId: string;
+  sellerId: string;
+  quantity: number;
+  createdAt: Timestamp;
+  status: string;
+  price: number;
+  total: number;
+}
+
+const { orderId } = Astro.params;
+console.log('Order ID en el frontmatter:', orderId);
+
+// Verificar la cookie de sesión
+const sessionCookie = Astro.cookies.get('session')?.value;
+
+if (!sessionCookie) {
+  return Astro.redirect('/login');
+}
+
+let user = null;
+let errorOccurred = false;
+let errorMessage = '';
+let purchaseData: Order | null = null;
+
+try {
+  // Verificar la cookie de sesión
+  const decodedClaims = await adminAuth.verifySessionCookie(sessionCookie, true);
+  user = decodedClaims;
+
+  // Obtener los datos de la compra usando 'orderId' como ID del documento
+  const purchaseDoc = await adminFirestore.collection('orders').doc(orderId).get();
+
+  if (!purchaseDoc.exists) {
+    throw new Error('Compra no encontrada');
+  }
+
+  const purchase = purchaseDoc.data() as Order;
+
+  // Verificar que la compra pertenece al usuario
+  if (purchase.userId !== user.uid) {
+    throw new Error('No autorizado');
+  }
+
+  // Verificar que el estado es "Completado"
+  if (purchase.status !== 'Completado') {
+    throw new Error('La compra no está completada');
+  }
+
+  // Verificar si ya existe una reseña
+  const reviewSnapshot = await adminFirestore
+    .collection('reviews')
+    .where('orderId', '==', orderId)
+    .limit(1)
+    .get();
+
+  if (!reviewSnapshot.empty) {
+    throw new Error('Ya has enviado una reseña para esta compra');
+  }
+
+  purchaseData = purchase;
+
+} catch (error) {
+  console.error('Error al cargar la página de reseña:', error);
+  errorOccurred = true;
+  if (error instanceof Error) {
+    errorMessage = error.message;
+  } else {
+    errorMessage = 'Ocurrió un error desconocido';
+  }
+}
+---
+<BaseLayout>
+  <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+    {errorOccurred ? (
+      <>
+        <h1 class="text-3xl font-bold mb-4">Ocurrió un error</h1>
+        <p class="text-gray-700 mb-6">{errorMessage || 'No pudimos cargar la página.'}</p>
+        <a href="/perfil" class="text-blue-600 hover:underline">Volver al perfil</a>
+      </>
+    ) : (
+      <>
+        <h1 class="text-3xl font-bold mb-4">Escribir Reseña</h1>
+        <p class="text-gray-700 mb-6">Por favor, escribe una reseña sobre tu experiencia con el producto y el vendedor.</p>
+        <form id="reviewForm" class="space-y-4">
+          <!-- Campo oculto con el orderId -->
+          <input type="hidden" name="orderId" value={orderId} />
+          
+          <div>
+            <label for="rating" class="block text-sm font-medium text-gray-700">Calificación (1-10)</label>
+            <input type="number" id="rating" name="rating" min="1" max="10" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" required />
+          </div>
+          <div>
+            <label for="reviewText" class="block text-sm font-medium text-gray-700">Reseña (máximo 200 caracteres)</label>
+            <textarea id="reviewText" name="reviewText" maxlength="200" class="mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2" rows="4" required></textarea>
+          </div>
+          <button type="submit" class="mt-4 bg-blue-600 text-white px-4 py-2 rounded">Enviar Reseña</button>
+        </form>
+        <div id="message" class="mt-4 text-red-600"></div>
+      </>
+    )}
+  </section>
+
+  <!-- Script del cliente para manejar el envío de la reseña -->
+  <script>
+    document.addEventListener('DOMContentLoaded', () => {
+      const form = document.getElementById('reviewForm') as HTMLFormElement;
+      const messageDiv = document.getElementById('message') as HTMLElement;
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        messageDiv.textContent = '';
+
+        // Crear un objeto FormData a partir del formulario
+        const formData = new FormData(form);
+        const orderId = formData.get('orderId') as string;
+        const ratingStr = formData.get('rating') as string;
+        const reviewText = formData.get('reviewText') as string;
+
+        // Validaciones adicionales
+        if (!orderId || isNaN(parseInt(ratingStr, 10)) || !reviewText) {
+          messageDiv.textContent = 'Todos los campos son requeridos.';
+          return;
+        }
+
+        const rating = parseInt(ratingStr, 10);
+
+        if (rating < 1 || rating > 10) {
+          messageDiv.textContent = 'La calificación debe estar entre 1 y 10.';
+          return;
+        }
+
+        if (reviewText.length > 200) {
+          messageDiv.textContent = 'La reseña debe tener un máximo de 200 caracteres.';
+          return;
+        }
+
+        try {
+          const response = await fetch('/api/user/submit-review', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ orderId, rating, reviewText }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert('Reseña enviada exitosamente.');
+            window.location.href = '/perfil';
+          } else {
+            messageDiv.textContent = result.message || 'Error al enviar la reseña.';
+          }
+        } catch (error) {
+          console.error('Error al enviar la reseña:', error);
+          messageDiv.textContent = 'Error al enviar la reseña. Por favor, intenta nuevamente.';
+        }
+      });
+    });
+  </script>
+</BaseLayout>

@@ -9,20 +9,20 @@
     "astro": "astro"
   },
   "devDependencies": {
-    "@astrojs/sitemap": "^3.1.6",
+    "@astrojs/sitemap": "^3.2.1",
     "@tailwindcss/forms": "^0.5.9",
     "@tailwindcss/typography": "^0.5.15",
     "@tailwindcss/vite": "^4.0.0-alpha.23",
     "@types/cookie-parser": "^1.4.7",
     "@types/node": "^22.7.4",
-    "astro": "^4.15.4",
+    "astro": "^4.16.7",
     "tailwindcss": "^4.0.0-alpha.23",
     "typescript": "^5.6.2"
   },
   "dependencies": {
-    "@astrojs/check": "^0.9.3",
+    "@astrojs/check": "^0.9.4",
     "@astrojs/react": "^3.6.2",
-    "@astrojs/vercel": "^7.8.1",
+    "@astrojs/vercel": "^7.8.2",
     "@types/bcrypt": "^5.0.2",
     "bcrypt": "^5.1.1",
     "busboy": "^1.6.0",

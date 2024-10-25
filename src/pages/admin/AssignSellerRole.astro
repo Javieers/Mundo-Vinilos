@@ -24,6 +24,7 @@ try {
 }
 ---
 <BaseLayout>
+  <!-- Sección para asignar rol de vendedor -->
   <section class="max-w-4xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
     <h2 class="text-3xl font-bold mb-6 text-center text-blue-600">Asignar Rol de Vendedor</h2>
     <p class="text-gray-700 mb-8 text-center">Bienvenido, <span class="font-semibold">{user.email}</span></p>
@@ -38,39 +39,182 @@ try {
     </form>
   </section>
 
+  <!-- Sección de Soporte -->
+  <section class="max-w-6xl mx-auto p-6 bg-white mt-10 rounded-lg shadow-md">
+    <h2 class="text-3xl font-bold mb-6 text-center text-green-600">Soporte</h2>
+    <div id="support-cases" class="space-y-6">
+      <!-- Los casos de soporte se cargarán aquí -->
+    </div>
+    <div id="support-messages" class="mt-4"></div>
+  </section>
+
+  <!-- Scripts -->
   <script>
+    // Manejo del formulario para asignar rol de vendedor
     document.getElementById('assignSellerForm').addEventListener('submit', async (event) => {
       event.preventDefault();
 
-      const emailElement = document.getElementById('email') as HTMLInputElement;
+      const emailElement = document.getElementById('email');
 
-      if (!emailElement) {
-        alert('No se pudo encontrar el campo de email.');
-        return;
+      if (emailElement instanceof HTMLInputElement) {
+        const email = emailElement.value;
+
+        try {
+          const response = await fetch('/api/setSellerClaim', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ email }),
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert(result.message);
+            emailElement.value = '';
+          } else {
+            alert('Error: ' + result.message);
+          }
+        } catch (error) {
+          console.error('Error al asignar el rol de vendedor:', error);
+          alert('Error al asignar el rol de vendedor');
+        }
+      } else {
+        alert('No se pudo obtener el email.');
       }
+    });
 
-      const email = emailElement.value;
-
+    // Función para cargar los casos de soporte
+    async function loadSupportCases() {
       try {
-        const response = await fetch('/api/setSellerClaim', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ email }),
+        const response = await fetch('/api/admin/support', {
+          method: 'GET',
+          credentials: 'include',
         });
 
         const result = await response.json();
 
         if (response.ok) {
-          alert(result.message);
-          // Opcionalmente, puedes limpiar el campo de email
-          emailElement.value = '';
+          const supportContainer = document.getElementById('support-cases');
+          supportContainer.innerHTML = ''; // Limpiar contenido previo
+
+          result.supportCases.forEach(caseItem => {
+            const caseDiv = document.createElement('div');
+            caseDiv.classList.add('p-4', 'border', 'border-gray-300', 'rounded-lg');
+
+            caseDiv.innerHTML = `
+              <p><strong>ID:</strong> ${caseItem.id}</p>
+              <p><strong>Usuario ID:</strong> ${caseItem.userId}</p>
+              <p><strong>Asunto:</strong> ${caseItem.subject}</p>
+              <p><strong>Número de Orden:</strong> ${caseItem.orderNumber || 'N/A'}</p>
+              <p><strong>Nombre del Vendedor:</strong> ${caseItem.sellerName || 'N/A'}</p>
+              <p><strong>Mensaje:</strong> ${caseItem.message}</p>
+              <p><strong>Fecha de Creación:</strong> ${new Date(caseItem.createdAt).toLocaleString()}</p>
+              <div class="mt-4">
+                <textarea id="response-${caseItem.id}" rows="3" class="w-full p-2 border border-gray-300 rounded" placeholder="Escribe tu respuesta aquí"></textarea>
+                <button class="send-response-btn mt-2 bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700" data-case-id="${caseItem.id}">Responder</button>
+              </div>
+              <div id="answers-${caseItem.id}" class="mt-4">
+                <!-- Respuestas se cargarán aquí -->
+              </div>
+            `;
+
+            supportContainer.appendChild(caseDiv);
+
+            // Asignar el evento click al botón de respuesta
+            const sendResponseButton = caseDiv.querySelector('.send-response-btn');
+            sendResponseButton.addEventListener('click', function() {
+              const caseId = this.getAttribute('data-case-id');
+              sendResponse(caseId);
+            });
+
+            // Cargar respuestas existentes
+            loadAnswers(caseItem.id);
+          });
         } else {
-          alert('Error: ' + result.message);
+          document.getElementById('support-messages').innerHTML = `<p class="text-red-500">${result.message}</p>`;
         }
       } catch (error) {
-        console.error('Error al asignar el rol de vendedor:', error);
-        alert('Error al asignar el rol de vendedor');
+        console.error('Error al cargar los casos de soporte:', error);
+        document.getElementById('support-messages').innerHTML = '<p class="text-red-500">Error al cargar los casos de soporte.</p>';
       }
-    });
+    }
+
+    // Función para cargar las respuestas de un caso de soporte
+    async function loadAnswers(caseId) {
+      try {
+        const response = await fetch(`/api/admin/support/${caseId}/answers`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+          const answersContainer = document.getElementById(`answers-${caseId}`);
+          answersContainer.innerHTML = ''; // Limpiar contenido previo
+
+          if (result.answers.length === 0) {
+            answersContainer.innerHTML = '<p class="text-gray-500">No hay respuestas aún.</p>';
+          } else {
+            result.answers.forEach(answer => {
+              const answerDiv = document.createElement('div');
+              answerDiv.classList.add('p-2', 'border', 'border-green-300', 'rounded-lg', 'mb-2', 'bg-green-50');
+              answerDiv.innerHTML = `
+                <p><strong>Respondido por Admin:</strong></p>
+                <p>${answer.message}</p>
+                <p class="text-sm text-gray-500">${new Date(answer.createdAt).toLocaleString()}</p>
+              `;
+              answersContainer.appendChild(answerDiv);
+            });
+          }
+        } else {
+          document.getElementById('support-messages').innerHTML = `<p class="text-red-500">${result.message}</p>`;
+        }
+      } catch (error) {
+        console.error('Error al cargar las respuestas:', error);
+        document.getElementById('support-messages').innerHTML = '<p class="text-red-500">Error al cargar las respuestas.</p>';
+      }
+    }
+
+    // Función para enviar una respuesta a un caso de soporte
+    async function sendResponse(caseId) {
+      const responseTextarea = document.getElementById(`response-${caseId}`);
+
+      if (responseTextarea instanceof HTMLTextAreaElement) {
+        const message = responseTextarea.value.trim();
+
+        if (!message) {
+          alert('Por favor, escribe una respuesta antes de enviar.');
+          return;
+        }
+
+        try {
+          const response = await fetch(`/api/admin/support/${caseId}/answer`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message }),
+            credentials: 'include',
+          });
+
+          const result = await response.json();
+
+          if (response.ok) {
+            alert(result.message);
+            responseTextarea.value = '';
+            loadAnswers(caseId); // Recargar las respuestas
+          } else {
+            alert('Error: ' + result.message);
+          }
+        } catch (error) {
+          console.error('Error al enviar la respuesta:', error);
+          alert('Error al enviar la respuesta.');
+        }
+      } else {
+        alert('No se pudo encontrar el campo de respuesta.');
+      }
+    }
+
+    // Cargar los casos de soporte al cargar la página
+    loadSupportCases();
   </script>
 </BaseLayout>
