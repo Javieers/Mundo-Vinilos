@@ -83,7 +83,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     }
 
     // Validar valores de estadoVinilo y estadoCaratula
-    const estadosValidos = ['Nuevo', 'Usado'];
+    const estadosValidos = ['Nuevo', 'Usado','nuevo', 'usado'];
     if (!estadosValidos.includes(estadoVinilo) || !estadosValidos.includes(estadoCaratula)) {
       return new Response(JSON.stringify({ message: 'Los valores de estado del vinilo y carátula son inválidos.' }), {
         status: 400,
