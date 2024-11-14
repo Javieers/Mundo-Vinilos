@@ -234,18 +234,22 @@ try {
       )}
     </section>
 
-    <!-- Bloque de Script -->
-    <script>
+    <!-- Bloque de Script Corregido con is:inline -->
+    <script is:inline>
       function togglePIN(event, orderId) {
         const pinElement = document.getElementById(`pin-${orderId}`);
         const button = event.target;
 
         if (pinElement.classList.contains('hidden')) {
           pinElement.classList.remove('hidden');
-          button.textContent = 'Ocultar PIN';
+          if (button instanceof HTMLButtonElement) {
+            button.textContent = 'Ocultar PIN';
+          }
         } else {
           pinElement.classList.add('hidden');
-          button.textContent = 'Mostrar PIN';
+          if (button instanceof HTMLButtonElement) {
+            button.textContent = 'Mostrar PIN';
+          }
         }
       }
     </script>

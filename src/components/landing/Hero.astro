@@ -33,16 +33,16 @@ const products = await getProducts();
       </dl>
     </div>
     <div class="mt-12">
-      <h2 class="text-2xl font-semibold text-center">Productos en tendencia</h2>
+      <h2 class="text-2xl font-semibold text-center">Recién Agregados</h2>
       <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
         {products.map(product => (
           <a href={`/product/${product.id}`} class="bg-white p-6 rounded-lg shadow-lg">
             <img
               src={product.imageUrl}
               alt={`${product.name} by ${product.artistName}`}
-              class="w-full h-48 object-cover rounded-md"
+              class="w-full h-64 object-contain mx-auto rounded-md" 
             />
-            <!-- Mostrar "RESERVA" si es preventa activa -->
+            {/* Mostrar "RESERVA" si es preventa activa */}
             {product.isPreOrder && product.releaseDate && (() => {
               const currentDate = new Date();
               const releaseDate = product.releaseDate.toDate();

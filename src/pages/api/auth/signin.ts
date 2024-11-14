@@ -9,7 +9,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     const idToken = request.headers.get('Authorization')?.split('Bearer ')[1];
 
     if (!idToken) {
-      return new Response(JSON.stringify({ message: 'Token no encontrado' }), {
+      return new Response(JSON.stringify({ message: 'No se pudieron obtener los valores de email o contraseña.' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
@@ -20,7 +20,7 @@ export const POST: APIRoute = async ({ request, cookies }) => {
     try {
       decodedToken = await adminAuth.verifyIdToken(idToken);
     } catch (error) {
-      return new Response(JSON.stringify({ message: 'Token inválido o expirado' }), {
+      return new Response(JSON.stringify({ message: 'No se pudieron obtener los valores de email o contraseña.' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' },
       });
