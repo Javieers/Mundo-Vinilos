@@ -142,7 +142,7 @@ const maxPrice = validPrices.length > 0 ? Math.max(...validPrices) : 1000;
                 <h3 class="mt-4 text-lg font-semibold">{product.name}</h3>
                 <p class="mt-2 text-gray-600">Artista: {product.artistName}</p>
                 <p class="mt-2 text-gray-800 font-bold">
-                  Precio: ${typeof product.price === 'number' ? product.price.toLocaleString('es-ES') : 'N/A'}
+                  Precio más bajo: ${typeof product.price === 'number' ? product.price.toLocaleString('es-ES') : 'N/A'}
                 </p>
               </a>
             ))}
